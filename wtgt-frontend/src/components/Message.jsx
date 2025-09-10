@@ -1,9 +1,9 @@
 // Message.jsx
 import React from 'react';
-import MessageText from './MessageText';
-import MessageImage from './MessageImage';
-import MessageFile from './MessageFile';
-import MessageVoice from './MessageVoice';
+import MessageText from './Messages/MessageText';
+import MessageImage from './Messages/MessageImage';
+import MessageFile from './Messages/MessageFile';
+import MessageVoice from './Messages/MessageVoice';
 
 const Message = ({ type, content, src, alt, filename, label, sender, timestamp }) => {
   return (

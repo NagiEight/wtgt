@@ -1,9 +1,9 @@
 // ChatPanel.jsx
 import React from 'react';
 import IconButton from './IconButton';
-import PictureIcon from './PictureIcon';
-import FileIcon from './FileIcon';
-import VoiceIcon from './VoiceIcon';
+import PictureIcon from './ChatIcons/PictureIcon';
+import FileIcon from './ChatIcons/FileIcon';
+import VoiceIcon from './ChatIcons/VoiceIcon';
 import Message from './Message';
 
 const ChatPanel = ({
