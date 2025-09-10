@@ -1,35 +1,56 @@
-import { useState } from 'react'
-import reactLogo from './assets/react.svg'
-import viteLogo from '/vite.svg'
-import './App.css'
+import React, { useState } from 'react';
+import ChatPanel from './components/ChatPanel';
+import VideoPanel from './components/VideoPanel';
 
-function App() {
-  const [count, setCount] = useState(0)
+const WTGTPage = () => {
+  const [messages, setMessages] = useState([]);
+  const [input, setInput] = useState('');
+  const [showChat, setShowChat] = useState(true);
+  const [chatOnRight, setChatOnRight] = useState(true);
+
+  const sendMessage = () => {
+    if (input.trim()) {
+      setMessages([...messages, input]);
+      setInput('');
+    }
+  };
 
   return (
-    <>
-      <div>
-        <a href="https://vite.dev" target="_blank">
-          <img src={viteLogo} className="logo" alt="Vite logo" />
-        </a>
-        <a href="https://react.dev" target="_blank">
-          <img src={reactLogo} className="logo react" alt="React logo" />
-        </a>
-      </div>
-      <h1>Vite + React</h1>
-      <div className="card">
-        <button onClick={() => setCount((count) => count + 1)}>
-          count is {count}
-        </button>
-        <p>
-          Edit <code>src/App.jsx</code> and save to test HMR
-        </p>
-      </div>
-      <p className="read-the-docs">
-        Click on the Vite and React logos to learn more
-      </p>
-    </>
-  )
-}
+    <div className="relative w-screen h-screen font-sans overflow-hidden bg-[#1b1a19]">
+      <svg
+        className="absolute inset-0 w-screen h-screen -z-10"
+        xmlns="http://www.w3.org/2000/svg"
+      >
+        <defs>
+          <radialGradient id="starGlow" cx="50%" cy="50%" r="80%" fx="50%" fy="50%">
+            <stop offset="0%" stopColor="#b09477" stopOpacity="0.2" />
+            <stop offset="100%" stopColor="#1b1a19" stopOpacity="0" />
+          </radialGradient>
+        </defs>
+        <rect width="100%" height="100%" fill="url(#starGlow)" />
+        <circle cx="20%" cy="30%" r="1.5" fill="#b09477" />
+        <circle cx="70%" cy="60%" r="1.2" fill="#b09477" />
+        <circle cx="40%" cy="80%" r="1.8" fill="#b09477" />
+        <circle cx="85%" cy="25%" r="1.4" fill="#b09477" />
+      </svg>
 
-export default App
+      <div className={`flex h-full w-full ${chatOnRight ? 'flex-row' : 'flex-row-reverse'}`}>
+        <VideoPanel />
+        {showChat && (
+          <ChatPanel
+            messages={messages}
+            input={input}
+            setInput={setInput}
+            sendMessage={sendMessage}
+            showChat={showChat}
+            setShowChat={setShowChat}
+            chatOnRight={chatOnRight}
+            setChatOnRight={setChatOnRight}
+          />
+        )}
+      </div>
+    </div>
+  );
+};
+
+export default WTGTPage;
