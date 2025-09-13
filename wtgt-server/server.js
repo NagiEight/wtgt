@@ -1,5 +1,5 @@
 import http from "http";
-import ws, { OPEN } from "ws";
+import ws from "ws";
 import crypto from "crypto";
 
 const users = {
@@ -30,34 +30,63 @@ wss.on("connection", (client, req) => {
     const UserID = crypto.createHash("sha256").update(IP).digest("hex");
 
     console.log(`New connection fron ${IP}.`);
-    client.send(JSON.stringify(messages));
-    client.send(JSON.stringify())
-     
+    client.send(JSON.stringify({ type: "init", messages, users }));
 
     client.on("message", (content, isBinary) => {
         if(isBinary) {
-            users[UserID].avt = content;
+            users[UserID].avt = content.toString("base64");
+            wss.clients.forEach((c) => {
+                if(c.readyState === ws.OPEN) {
+                    const toSendJSON = {
+                        type: "avt",
+                        content: {
+                            UserID,
+                            avt: content.toString("base64")
+                        }
+                    }
+
+                    c.send(JSON.stringify(toSendJSON));
+                }
+            });
         }
         else {
             const ContentJSON = JSON.parse(content.toString());
 
             if(ContentJSON.type === "message") {
-                messages[
-                    crypto.createHash("sha256")
+                const msgID = crypto.createHash("sha256")
                         .update(UserID.concat(ContentJSON.content, Object.keys(messages).length.toString()))
-                        .digest("hex")
-                ] = {
-                    "SenderID": UserID,
-                    "content": ContentJSON.content,
-                    "timestamp": Date.now()
-                }
+                        .digest("hex");
 
-                Object.entries(users).forEach(([userId, userinfo]) => {
-                    if(users)
+                const msgObj = {
+                    SenderID: UserID,
+                    content: ContentJSON.content,
+                    timestamp: Date.now()
+                } 
+
+                messages[msgID] = msgObj;
+
+                wss.clients.forEach((c) => {
+                    if(c.readyState === ws.OPEN) {
+                        const toSendJSON = {
+                            type: "message",
+                            content: {
+                                info: msgObj
+                            }
+                        }
+
+                        c.send(JSON.stringify(toSendJSON));
+                    }
                 });
             }
             else if(ContentJSON.type === "member") {
-                users[UserID].UserName = ContentJSON.UserName
+                users[UserID].UserName = ContentJSON.UserName;
+                const ContentJSON = {
+                    type: "member",
+                    content: {
+                        UserID,
+                        UserName: ContentJSON.UserName
+                    }
+                }
             }
             else {
                 client.send(`Unknown content type: ${ContentJSON.type}.`)
