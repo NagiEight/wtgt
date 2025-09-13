@@ -35,6 +35,8 @@ wss.on("connection", (client, req) => {
 	client.send(JSON.stringify({ type: "init", messages, users }));
 
 	client.on("message", (content, isBinary) => {
+        console.log(`Incoming request from: ${UserID}`);
+
 		if(isBinary) {
 			users[UserID].avt = content.toString("base64");
 			wss.clients.forEach((c) => {
@@ -53,7 +55,6 @@ wss.on("connection", (client, req) => {
 		}
 		else {
 			const ContentJSON = JSON.parse(content.toString());
-
 			if(ContentJSON.type === "message") {
 				const msgID = crypto.createHash("sha256")
 						.update(UserID.concat(ContentJSON.content, Object.keys(messages).length.toString()))
