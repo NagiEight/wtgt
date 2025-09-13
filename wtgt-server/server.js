@@ -1,6 +1,7 @@
-import http from "http";
-import ws from "ws";
-import crypto from "crypto";
+
+const http = require("http");
+const ws = require("ws");
+const crypto = require("crypto");
 
 const PORT = 3000;
 
