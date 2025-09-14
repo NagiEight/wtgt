@@ -17,20 +17,20 @@ const ChatPanel = ({
 }) => {
   return (
     <div className="w-[30%] h-full flex flex-col justify-between p-4">
-      <div className="flex gap-2 mb-4">
+      <div className="mb-2 flex justify-end gap-2">
         <button
-          onClick={() => setChatOnRight(!chatOnRight)}
-          className="px-3 py-1 text-sm rounded-md"
+          onClick={() => setChatOnRight((prev) => !prev)}
+          className="text-xs px-2 py-1 transition hover:scale-105"
           style={{
             backgroundColor: '#b09477',
             color: '#1b1a19',
-            boxShadow: 'inset 0 0 0 2px #1b1a19',
+            boxShadow: '0 0 0 1px #1b1a19',
+            border: 'none',
           }}
         >
-          Move Chat {chatOnRight ? 'Left' : 'Right'}
+          Chat {chatOnRight ? '←' : '→'}
         </button>
       </div>
-
       <div
         className="flex-grow overflow-y-auto mb-4 rounded-md bg-[#3e3935] p-3"
         style={{
