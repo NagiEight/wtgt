@@ -2,25 +2,47 @@
 const http = require("http");
 const ws = require("ws");
 const crypto = require("crypto");
+const fs = require("fs");
 
 const PORT = 3000;
 
 const users = {
-	/*	"UserID": {
-	 *		"UserName": Claire Iidea,
-	 *		"avt": <bytestring>
+	/*	UserID: {
+	 *		UserName: Claire Iidea,
+	 *		avt: <bytestring>
 	 *	}
 	 * */
 };
 
 const messages = {
-	/*	"MessageID": {
-	 *		"SenderID": SenderID,
-	 *		"content": "Hello World!",
-	 *		"timestamp": somethingsomething
+	/*	MessageID: {
+	 *		SenderID: SenderID,
+	 *		content: "Hello World!",
+	 *		timestamp: somethingsomething
 	 *	}
 	 * */
 };
+
+const logs = [
+    /**
+     *  {
+     *      event: "connection",
+     *      user: userID,
+     *      timestamp: getCurrentTime()
+     *  }
+     *  {
+     *      event: "disconnection",
+     *      user: userID,
+     *      timestamp: getCurrentTime()
+     *  },
+     *  {
+     *      event: "message",
+     *      user: userID,
+     *      text: "Hello World!",
+     *      timestamp: getCurrentTime()
+     *  }
+     */
+];
 
 const server = http.createServer((req, res) => {
 
@@ -32,8 +54,15 @@ wss.on("connection", (client, req) => {
 	const IP = req.socket.remoteAddress;
 	const UserID = crypto.createHash("sha256").update(IP).digest("hex");
 
+    logs.push({
+        event: "connection",
+        user: UserID,
+        timestamp: getCurrentTime()
+    });
+
 	console.log(`New connection fron ${IP}.`);
 	client.send(JSON.stringify({ type: "init", messages, users }));
+
 
 	client.on("message", (content, isBinary) => {
         console.log(`Incoming request from: ${UserID}`);
@@ -114,6 +143,19 @@ wss.on("connection", (client, req) => {
 server.listen(PORT, () => {
 	console.log(`Hello World! Server's running at port ${PORT}.`)
 });
+
+server.on("close", () => {
+    fs.mkdir("logs", { recursive: true }, (err) => {
+        if(err)
+            throw err;
+        
+        console.log("Log folder created.")
+    });
+});
+
+const createLog = async () => {
+    fs.mkdir("logs", { recursive: true });
+};
 
 const getCurrentTime = () => {
 	const now = new Date();
