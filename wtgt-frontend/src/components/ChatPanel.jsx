@@ -19,17 +19,6 @@ const ChatPanel = ({
     <div className="w-[30%] h-full flex flex-col justify-between p-4">
       <div className="flex gap-2 mb-4">
         <button
-          onClick={() => setShowChat(!showChat)}
-          className="px-3 py-1 text-sm rounded-md"
-          style={{
-            backgroundColor: '#b09477',
-            color: '#1b1a19',
-            boxShadow: 'inset 0 0 0 2px #1b1a19',
-          }}
-        >
-          {showChat ? 'Hide Chat' : 'Show Chat'}
-        </button>
-        <button
           onClick={() => setChatOnRight(!chatOnRight)}
           className="px-3 py-1 text-sm rounded-md"
           style={{

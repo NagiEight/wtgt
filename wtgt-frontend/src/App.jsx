@@ -2,32 +2,34 @@ import React, { useState, useEffect, useRef } from 'react';
 import ChatPanel from './components/ChatPanel';
 import VideoPanel from './components/VideoPanel';
 import MessageManager from './utils/messageManager';
+import FloatingChatButton from './components/FloatingChatButton';
+
 const WTGTPage = () => {
   const [input, setInput] = useState("");
   const [messages, setMessages] = useState([]);
   const [showChat, setShowChat] = useState(true);
   const [chatOnRight, setChatOnRight] = useState(true);
   const managerRef = useRef(null);
-
   useEffect(() => {
     const manager = new MessageManager();
 
+
     manager.onMessage((msg) => {
+      console.log(msg.type);
       if (msg.type === "init") {
         const messages = msg.content?.messages || {};
         setMessages(Object.values(messages));
       } else if (msg.type === "message") {
         const newMsg = msg.content?.info;
-        if (newMsg) {
+        if (newMsg?.SenderID !== managerRef.current.userID) {
           setMessages((prev) => [...prev, newMsg]);
-        } else {
-          console.warn("Malformed message broadcast:", msg);
         }
       }
     });
 
     managerRef.current = manager;
   }, []);
+
 
   const sendMessage = () => {
     if (input.trim()) {
@@ -56,6 +58,11 @@ const WTGTPage = () => {
 
       <div className={`flex h-full w-full ${chatOnRight ? 'flex-row' : 'flex-row-reverse'}`}>
         <VideoPanel />
+        <FloatingChatButton
+          onClick={() => setShowChat((prev) => !prev)}
+          isOpen={showChat}
+        />
+
         {showChat && (
           <ChatPanel
             messages={messages}
