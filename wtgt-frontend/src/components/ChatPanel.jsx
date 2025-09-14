@@ -1,4 +1,3 @@
-// ChatPanel.jsx
 import React from 'react';
 import IconButton from './IconButton';
 import PictureIcon from './ChatIcons/PictureIcon';
@@ -16,40 +15,6 @@ const ChatPanel = ({
   chatOnRight,
   setChatOnRight,
 }) => {
-  const placeholderMessages = [
-    {
-      type: 'text',
-      content: 'Hey, did you catch Suisei’s last live? 🌠',
-      sender: { name: 'Aki', avatar: 'https://via.placeholder.com/24' },
-      timestamp: '01:23',
-    },
-    {
-      type: 'image',
-      src: 'https://via.placeholder.com/150',
-      alt: 'Suisei fan art',
-      sender: { name: 'Mika', avatar: 'https://via.placeholder.com/24' },
-      timestamp: '01:24',
-    },
-    {
-      type: 'file',
-      filename: 'setlist.pdf',
-      sender: { name: 'Aki', avatar: 'https://via.placeholder.com/24' },
-      timestamp: '01:25',
-    },
-    {
-      type: 'voice',
-      label: 'Voice message: 00:12',
-      sender: { name: 'Mika', avatar: 'https://via.placeholder.com/24' },
-      timestamp: '01:26',
-    },
-    {
-      type: 'text',
-      content: 'I saved the setlist here 📎',
-      sender: { name: 'Aki', avatar: 'https://via.placeholder.com/24' },
-      timestamp: '01:27',
-    },
-  ];
-
   return (
     <div className="w-[30%] h-full flex flex-col justify-between p-4">
       <div className="flex gap-2 mb-4">
@@ -84,8 +49,17 @@ const ChatPanel = ({
           borderRadius: '8px',
         }}
       >
-        {placeholderMessages.map((msg, i) => (
-          <Message key={i} {...msg} />
+        {messages.map((msg, i) => (
+          <Message
+            key={i}
+            type="text"
+            content={msg.content}
+            sender={{
+              name: msg.SenderID || 'Anonymous',
+              avatar: 'https://via.placeholder.com/24',
+            }}
+            timestamp={msg.timestamp}
+          />
         ))}
       </div>
 

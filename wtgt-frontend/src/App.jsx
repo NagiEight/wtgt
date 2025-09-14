@@ -1,20 +1,40 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import ChatPanel from './components/ChatPanel';
 import VideoPanel from './components/VideoPanel';
-
+import MessageManager from './utils/messageManager';
 const WTGTPage = () => {
+  const [input, setInput] = useState("");
   const [messages, setMessages] = useState([]);
-  const [input, setInput] = useState('');
   const [showChat, setShowChat] = useState(true);
   const [chatOnRight, setChatOnRight] = useState(true);
+  const managerRef = useRef(null);
+
+  useEffect(() => {
+    const manager = new MessageManager();
+
+    manager.onMessage((msg) => {
+      if (msg.type === "init") {
+        const messages = msg.content?.messages || {};
+        setMessages(Object.values(messages));
+      } else if (msg.type === "message") {
+        const newMsg = msg.content?.info;
+        if (newMsg) {
+          setMessages((prev) => [...prev, newMsg]);
+        } else {
+          console.warn("Malformed message broadcast:", msg);
+        }
+      }
+    });
+
+    managerRef.current = manager;
+  }, []);
 
   const sendMessage = () => {
     if (input.trim()) {
-      setMessages([...messages, input]);
-      setInput('');
+      managerRef.current.sendMessage(input);
+      setInput("");
     }
   };
-
   return (
     <div className="relative w-screen h-screen font-sans overflow-hidden bg-[#1b1a19]">
       <svg

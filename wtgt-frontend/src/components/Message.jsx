@@ -1,11 +1,10 @@
-// Message.jsx
 import React from 'react';
 import MessageText from './Messages/MessageText';
 import MessageImage from './Messages/MessageImage';
 import MessageFile from './Messages/MessageFile';
 import MessageVoice from './Messages/MessageVoice';
 
-const Message = ({ type, content, src, alt, filename, label, sender, timestamp }) => {
+const Message = ({ type = 'text', content, src, alt, filename, label, sender, timestamp }) => {
   return (
     <div
       className="p-3 mb-3 rounded-md"
