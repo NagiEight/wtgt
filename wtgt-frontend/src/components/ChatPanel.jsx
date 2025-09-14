@@ -69,6 +69,12 @@ const ChatPanel = ({
           type="text"
           value={input}
           onChange={(e) => setInput(e.target.value)}
+          onKeyDown={(e) => {
+            if (e.key === 'Enter') {
+              e.preventDefault();
+              sendMessage();
+            }
+          }}
           placeholder="Message..."
           className="flex-1 px-2 py-1 text-sm"
           style={{
@@ -78,6 +84,7 @@ const ChatPanel = ({
             boxShadow: 'inset 0 0 0 2px #645b51',
           }}
         />
+
         <button
           onClick={sendMessage}
           className="px-3 py-1 text-sm transition hover:scale-105"
