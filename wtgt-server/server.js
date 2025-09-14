@@ -1,8 +1,11 @@
 
-const http = require("http");
-const ws = require("ws");
-const crypto = require("crypto");
-const fs = require("fs");
+const
+    http = require("http"),
+    ws = require("ws"),
+    crypto = require("crypto"),
+    fs = require("fs/promises"),
+    path = require("path")
+;
 
 const PORT = 3000;
 
@@ -52,7 +55,7 @@ const wss = new ws.Server({server});
 
 wss.on("connection", (client, req) => {
 	const IP = req.socket.remoteAddress;
-	const UserID = crypto.createHash("sha256").update(IP).digest("hex");
+	const UserID = sha256Hash(IP);
 
     logs.push({
         event: "connection",
@@ -86,15 +89,20 @@ wss.on("connection", (client, req) => {
 		else {
 			const ContentJSON = JSON.parse(content.toString());
 			if(ContentJSON.type === "message") {
-				const msgID = crypto.createHash("sha256")
-						.update(UserID.concat(ContentJSON.content, Object.keys(messages).length.toString()))
-						.digest("hex");
+				const msgID = sha256Hash(UserID.concat(ContentJSON.content, Object.keys(messages).length.toString()));
 
 				const msgObj = {
 					SenderID: UserID,
 					content: ContentJSON.content,
 					timestamp: getCurrentTime()
 				}
+
+                logs.push({
+                    event: "message",
+                    user: UserID,
+                    text: ContentJSON.content,
+                    timestamp: getCurrentTime()
+                });
 
 				messages[msgID] = msgObj;
 
@@ -126,6 +134,15 @@ wss.on("connection", (client, req) => {
 			}
 		}
 	});
+
+    client.on("close", () => {
+        console.log(`${UserID} disconnected.`)
+        logs.push({
+            event: "disconnection",
+            user: UserID,
+            timestamp: getCurrentTime()
+        });
+    });
 });
 
 /*	{
@@ -144,17 +161,71 @@ server.listen(PORT, () => {
 	console.log(`Hello World! Server's running at port ${PORT}.`)
 });
 
-server.on("close", () => {
-    fs.mkdir("logs", { recursive: true }, (err) => {
-        if(err)
-            throw err;
-        
-        console.log("Log folder created.")
-    });
+server.on("close", createLog);
+
+server.on('error', (err) => {
+    console.error('Server error:', err);
+    shutdown();
 });
 
+process.on('SIGINT', shutdown);
+process.on('SIGTERM', shutdown);
+
+process.on('uncaughtException', (err) => {
+    console.error('Uncaught Exception:', err);
+    shutdown();
+});
+
+process.on('unhandledRejection', (reason) => {
+    console.error('Unhandled Rejection:', reason);
+    shutdown();
+});
+
+const shutdown = () => {
+    console.log('Shutting down gracefully...');
+    server.close(() => {
+        createLog();
+        console.log('All connections closed, exiting.');
+        process.exit(0);
+    });
+}
+  
+
 const createLog = async () => {
-    fs.mkdir("logs", { recursive: true });
+    await fs.mkdir("logs", { recursive: true });
+    let logID = sha256Hash(getCurrentTime());
+    let logstring = [];
+
+    logs.forEach((log) => {
+        if(log.event === "connection") {
+            logstring.push(`[${log.timestamp}] ${log.user} connected.`);
+        }
+        else if(log.event === "disconnection") {
+            logstring.push(`[${log.timestamp}] ${log.user} disconnected.`);
+        }
+        else if(log.event === "message") {
+            logstring.push(`[${log.timestamp}] ${log.user}: ${log.text}`);
+        }
+    });
+
+    let fileName = `${logID}.log`;
+    let filePath = path.join("logs", fileName);
+
+    let counter = 1;
+    while(true) {
+        try {
+            await fs.access(filePath);
+
+            fileName = `${logID}_${counter}.log`;
+            filePath = path.join("logs", fileName);
+            ++counter;
+        }
+        catch {
+            break;
+        }
+    }
+
+    await fs.writeFile(filePath, logstring.join("\n"), "utf-8");
 };
 
 const getCurrentTime = () => {
@@ -169,4 +240,8 @@ const getCurrentTime = () => {
 	const formatted = `${hours}:${minutes}:${seconds} ${day}/${month}/${year}`;
 
 	return formatted;
+}
+
+const sha256Hash = (content) => {
+    return crypto.createHash("sha256").update(content).digest("hex");
 }
