@@ -23,6 +23,17 @@
         }
     },
     {
+        "type": "end"
+    },
+    {
+        "type": "sync",
+        "content": "1:20"
+    },
+    {
+        "type": "pause",
+        "content": true
+    },
+    {
         "type": "election", 
         "content": "memberID"
     },

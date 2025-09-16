@@ -130,7 +130,7 @@ wss.on("connection", (client, req) => {
 
             case "message":
                 if(isInRoom) {
-                    const MessageID = sha256Hash(UserID.concat(ContentJSON.content, Object.keys(rooms[members[UserID].In].messages).length.toString()));
+                    const MessageID = sha256Hash(UserID + ContentJSON.content + Object.keys(rooms[members[UserID].In].messages).length.toString());
                     const MessageObject = {
                         Sender: UserID,
                         Text: ContentJSON.content,
@@ -179,7 +179,7 @@ wss.on("connection", (client, req) => {
             case "leave":
                 if(isInRoom) {
                     if(UserID === members[UserID].In) {
-                        broadcastToRoom(members[UserID].In, {type: "end", content: UserID});
+                        broadcastToRoom(members[UserID].In, {type: "end"});
 
                         for(const MemberID of rooms[members[UserID].In].members) {
                             members[MemberID].In = "";
@@ -203,6 +203,7 @@ wss.on("connection", (client, req) => {
                 if(UserID === members[UserID].In) {
                     rooms[members[UserID].In].isPaused = ContentJSON.content;
                     broadcastToRoom(members[UserID].In, ContentJSON);
+                    Logs.addEntry(members[UserID].In, "pause", UserID);
                 }
                 else {
                     sendError(client, "Insufficient permission.");
@@ -256,6 +257,9 @@ server.listen(PORT, () => {
 
 //classes
 const Logs = class {
+    /**
+     * Server's log. Use addEntry instead of mutating this directly.
+     */
     static logs = [
         /**
          *  {
@@ -289,12 +293,8 @@ const Logs = class {
     ];
 
     /**
-     * 
-     * @param {string} entryType 
-     * @param {string} entryTarget 
-     * @param {object} extras 
-    */
-
+     * A list of predefined suffix for most logging event types. Don't mutate this, please.
+     */
     static formatList = {
         connection: "connected.",
         disconnection: "disconnected.",
@@ -304,11 +304,18 @@ const Logs = class {
         leave: "left.",
         pause: "paused."
     };
-
+    
     static generateLogString = (logEntry, suffix) => {
         return `{${logEntry.roomID}}[${logEntry.timestamp}] ${logEntry.entryTarget}${suffix}\n`;
     };
-
+    
+    /**
+     * Add a new entry to the logs.
+     * 
+     * @param {string} entryType 
+     * @param {string} entryTarget 
+     * @param {object} extras 
+    */
     static addEntry = (roomID, entryType, entryTarget, extras = {}) => {
         const allowedEntryType = ["connection", "disconnection", "election", "host", "message", "join", "leave", "pause", "sync"];
 
@@ -354,6 +361,9 @@ const Logs = class {
         return output.trim();
     }
 
+    /**
+     * Create a log file at
+     */
     static createLog = async () => {
         await fs.mkdir("logs", { recursive: true });
     
