@@ -37,10 +37,10 @@ const
          *  }
         */
     },
-    wss = new ws.Server({ server }),
     server = http.createServer((req, res) => {
-
-    })
+        
+    }),
+    wss = new ws.Server({ server })
 ;
 
 wss.on("connection", (client, req) => {
