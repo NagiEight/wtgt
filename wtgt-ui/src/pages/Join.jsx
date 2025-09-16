@@ -1,6 +1,5 @@
 import React, { useState } from 'react';
 import bannerImage from '../assets/banner.png'; // Adjust path if needed
-import { joinRoom } from '../utils/roomManager';
 
 
 const Join = () => {
@@ -10,8 +9,6 @@ const Join = () => {
     const handleJoin = async () => {
         // You can redirect or validate here
         console.log(`Joining room #${roomId} as ${username}`);
-
-        await joinRoom({ roomId: roomId, username: username });
     };
     return (
         <section

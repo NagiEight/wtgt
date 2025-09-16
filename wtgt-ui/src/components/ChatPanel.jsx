@@ -1,33 +1,46 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { PaperAirplaneIcon } from '@heroicons/react/24/solid';
-import { connectToRoom, sendMessage } from '../utils/chatManager';
 
-
-const ChatPanel = ({ roomNumber = 'Room #1234' }) => {
-    const [messages, setMessages] = useState([
-        { user: 'Nagi', text: 'This scene is wild 😱' },
-        { user: 'Copilot', text: 'I can’t believe what just happened!' },
-        { user: 'Claire', text: 'current' }
-    ]);
+const ChatPanel = ({ roomNumber = 'Room #1234', username = 'You', roomId = 'default-room' }) => {
+    const [messages, setMessages] = useState([]);
     const [input, setInput] = useState('');
+    const chatManagerRef = useRef(null);
+
+    useEffect(() => {
+        chatManagerRef.current = chatManager;
+
+        // Set up callbacks
+        chatManager
+            .on('onNewMessage', (msg) => {
+                setMessages((prev) => [...prev, {
+                    user: msg.sender,
+                    text: msg.text,
+                    timestamp: msg.timestamp
+                }]);
+            })
+            .on('onHistoryUpdate', (history) => {
+                const formatted = history.map(msg => ({
+                    user: msg.sender,
+                    text: msg.text,
+                    timestamp: msg.timestamp
+                }));
+                setMessages(formatted);
+            });
+
+        // Connect to room
+        roomManager.connect();
+
+        return () => {
+            roomManager.disconnect?.(); // If you have a disconnect method
+        };
+    }, [roomId, username]);
 
     const handleSend = () => {
-        if (input.trim()) {
-            setMessages([...messages, { user: 'You', text: input }]);
+        if (input.trim() && chatManagerRef.current) {
+            chatManagerRef.current.sendMessage(input);
             setInput('');
         }
     };
-    useEffect(() => {
-        connectToRoom({
-            roomId,
-            username,
-            onMessage: (msg) => setMessages((prev) => [...prev, msg]),
-            onUserJoin: (notice) => console.log(notice),
-            onSync: ({ time, paused }) => syncVideo(time, paused)
-        });
-
-        return () => disconnectChat();
-    }, [roomId, username]);
 
     return (
         <div className="w-80 border-l border-gray-200 bg-white p-4 flex flex-col h-[calc(100vh-4rem)]">
