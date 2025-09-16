@@ -1,10 +1,12 @@
 import React, { useState } from 'react';
 import bannerImage from '../assets/banner.png';
 import { hostRoom } from '../utils/roomManager';
-
+import { useNavigate } from 'react-router-dom';
 
 
 const Host = () => {
+    const navigate = useNavigate();
+
     const [roomId, setRoomId] = useState('');
     const [username, setUsername] = useState('');
     const [fileName, setFileName] = useState('');
@@ -20,8 +22,10 @@ const Host = () => {
     const handleHost = async () => {
         console.log(`Hosting room #${roomId} as ${username} with ${fileName}`);
         await hostRoom({ roomId: roomId, username: username, videoFile: videoFile });
-        // Redirect or initialize session here
+        navigate(`/watch/${roomId}`);
     };
+
+    const isFormValid = roomId && username && videoFile;
 
     return (
         <section
@@ -65,7 +69,9 @@ const Host = () => {
                     />
                     <button
                         onClick={handleHost}
-                        className="w-full px-4 py-2 bg-[var(--color-cyan-500)] text-white rounded-md font-semibold hover:bg-[var(--color-cyan-600)] transition"
+                        disabled={!isFormValid}
+                        className={`w-full px-4 py-2 bg-[var(--color-cyan-500)] text-white rounded-md font-semibold transition clickable
+                            ${!isFormValid ? 'opacity-50 cursor-not-allowed' : 'hover:bg-[var(--color-cyan-600)]'}`}
                     >
                         Host Room
                     </button>
