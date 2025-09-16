@@ -1,0 +1,63 @@
+[    
+    {
+        "type": "error",
+        "content": "error message"
+    },
+    {
+        "type": "message",
+        "content": {
+            "MessageID": "messageID",
+            "MessageObj": {
+                "Sender": "memberID",
+                "Text":"Hello World!",
+                "Timestamp": "somethingsomething"
+            }
+        }
+    },
+    {
+        "type": "join",
+        "content": {
+            "UserID": "userID",
+            "UserName":"Nagi Eight",
+            "Avt": "<bytestring>"
+        }
+    },
+    {
+        "type": "election", 
+        "content": "memberID"
+    },
+    {
+        "type": "leave",
+        "content": "memberID"
+    },
+    {
+        "type": "init", 
+        "content": {
+            "CurrentMedia": "currentMediaName",
+            "IsPaused": true,
+            "Mods": ["ModsIDs"],
+            "Members": {
+                "memberID": {
+                    "UserName": "Claire Iidea",
+                    "Avt": "<bytestring>"
+                },
+                "memberID2": {
+                    "UserName": "Nagi Eight",
+                    "Avt": "<bytestring>"
+                }
+            },
+            "Messages": {
+                "messageID": {
+                    "Sender": "memberID",
+                    "Text": "Hello World!",
+                    "Timestamp": "somethingsomething"
+                },
+                "messageID2": {
+                    "Sender": "memberID2",
+                    "Text": "eeeeeeeeeee",
+                    "Timestamp": "somethingsomething"
+                }
+            }
+        }
+    }
+]

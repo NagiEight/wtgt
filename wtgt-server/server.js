@@ -1,35 +1,4 @@
-/**
- * server.js
- * 
- * Backend server for a local chat application.
- * 
- * Features:
- * - HTTP server (currently unused, but can be extended for REST endpoints)
- * - WebSocket server for real-time chat communication
- * - User and message management in-memory
- * - Logging of connections, disconnections, and messages
- * - Graceful shutdown and persistent log file creation
- * 
- * Data Structures:
- * - users: Stores user information keyed by UserID
- * - messages: Stores chat messages keyed by MessageID
- * - logs: Stores event logs for connections, disconnections, and messages
- * 
- * WebSocket Message Types:
- * - "init": Initial data sent to client after connection
- * - "message": Chat message
- * - "member": User profile/name update
- * - "avt": Avatar image update (binary)
- * - "pause": Media pause/resume state
- * - "media": Media change event
- * 
- * Logging:
- * - Logs are saved to the "logs" directory on shutdown or server close.
- * 
- * Error Handling:
- * - Handles server errors, uncaught exceptions, and unhandled promise rejections.
- */
-
+//Imports
 const
     http = require("http"),
     ws = require("ws"),
@@ -38,172 +7,192 @@ const
     path = require("path")
 ;
 
-const PORT = 3000;
+//Constants
+const 
+    PORT = 3000,
+    rooms = {
+        /**
+         *  roomID (will be the same as the host's id): {
+         *      currentMedia: "medianame.mp4",
+         *      mods: [],
+         *      members: [...memberIDs],
+         *      isPaused: false,
+         *      messages: {
+         *          messageID: {
+         *              Sender: memberID,
+         *              Text: "hello world!",
+         *              Timestamp: somethingsomething
+         *          }
+         *      }
+         *  }
+         */
+    },
+    members = {
+        /**
+         *  MemberID: {
+         *      UserName: "Claire Iidea",
+         *      In: roomID,
+         *      Socket: wsObj,
+         *      Avt: <byteString>
+         *  }
+        */
+    },
+    wss = new ws.Server({ server }),
+    server = http.createServer((req, res) => {
 
-// In-memory user storage
-const users = {
-	/**
-     *  UserID: {
-	 *		UserName: Claire Iidea,
-	 *		avt: <bytestring>
-	 *	}
-	 */
-};
+    })
+;
 
-// In-memory message storage
-const messages = {
-	/**
-     *	MessageID: {
-	 *		SenderID: SenderID,
-	 *		content: "Hello World!",
-	 *		timestamp: somethingsomething
-	 *	}
-	 */
-};
+//Runtime Variables
+let 
 
-// Event logs for connections, disconnections, and messages
-const logs = [
-    /**
-     *  {
-     *      event: "connection",
-     *      user: userID,
-     *      timestamp: getCurrentTime()
-     *  }
-     *  {
-     *      event: "disconnection",
-     *      user: userID,
-     *      timestamp: getCurrentTime()
-     *  },
-     *  {
-     *      event: "message",
-     *      user: userID,
-     *      text: "Hello World!",
-     *      timestamp: getCurrentTime()
-     *  }
-     */
-];
+;
 
-// HTTP server (can be extended for REST endpoints)
-const server = http.createServer((req, res) => {
-
-});
-
-// Media state for chat room
-let currentMedia = "";
-let isPaused = false;
-
-// WebSocket server for real-time communication
-const wss = new ws.Server({server});
-
-/**
- * Handles new WebSocket connections.
- * Assigns a UserID based on client IP, sends initial data, and listens for messages.
- */
 wss.on("connection", (client, req) => {
-	const IP = req.socket.remoteAddress;
-	const UserID = sha256Hash(IP);
+    const
+        userProfile = JSON.parse(req.headers["profile"]),
+        IP = req.socket.remoteAddress,
+        UserID = sha256Hash(IP)
+    ;
 
-    logs.push({
-        event: "connection",
-        user: UserID,
-        timestamp: getCurrentTime()
+    Logs.addEntry("", "connection", UserID);
+
+    members[UserID] = {
+        UserName: userProfile["UserName"],
+        In: "",
+        Socket: client,
+        Avt: userProfile["Avt"]
+    }
+
+    client.on("close", () => {
+        Logs.addEntry("", "disconnection", UserID);
+        delete members[UserID];
     });
 
-	console.log(`New connection fron ${IP}.`);
-	client.send(JSON.stringify({ type: "init", content: { messages, users,  }}));
+    client.on("message", (message) => {
+        const ContentJSON = JSON.parse(message.toString());
+        const isInRoom = members[UserID].In !== "";
 
-    // Handle incoming messages from client
-	client.on("message", (content, isBinary) => {
-        console.log(`Incoming request from: ${UserID}`);
+        switch(ContentJSON.type) {
+            case "host":
+                if(!isInRoom) {
+                    members[UserID].In = UserID;
+                    rooms[UserID] = {
+                        currentMedia: ContentJSON.content.MediaName,
+                        isPaused: ContentJSON.content.IsPaused,
+                        mods: [],
+                        members: [UserID],
+                        messages: {}
+                    }
+                    Logs.addEntry(UserID, "host", UserID);
+                }
+                else {
+                    sendError(client, `Member ${UserID} is already belong to a room.`);
+                }
+            break;
 
-		if(isBinary) {
-			// Handle avatar image upload (binary data)
-			users[UserID].avt = content.toString("base64");
-			wss.clients.forEach((c) => {
-				if(c.readyState === ws.OPEN) {
-					const toSendJSON = {
-						type: "avt",
-						content: {
-							UserID,
-							avt: content.toString("base64")
-						}
-					}
+            case "join":
+                if(!isInRoom) {
+                    rooms[ContentJSON.content].members.push(UserID);
+                    members[UserID].In = ContentJSON.content;
 
-					c.send(JSON.stringify(toSendJSON));
-				}
-			});
-		}
-		else {
-			const ContentJSON = JSON.parse(content.toString());
-			if(ContentJSON.type === "message") {
-				// Handle chat message
-				const msgID = sha256Hash(UserID.concat(ContentJSON.content, Object.keys(messages).length.toString()));
+                    const currentRoom = rooms[ContentJSON.content];
+                    const membersObj = {};
 
-				const msgObj = {
-					SenderID: UserID,
-					content: ContentJSON.content,
-					timestamp: getCurrentTime()
-				}
+                    for (const memberID of currentRoom.members) {
+                        membersObj[memberID] = {
+                            UserName: members[memberID].UserName,
+                            Avt: members[memberID].Avt
+                        };
+                    }
 
-                logs.push({
-                    event: "message",
-                    user: UserID,
-                    text: ContentJSON.content,
-                    timestamp: getCurrentTime()
-                });
+                    client.send(JSON.stringify({type: "init", content: {
+                        CurrentMedia: currentRoom.MediaName,
+                        IsPaused: currentRoom.IsPaused,
+                        Mods: currentRoom.mods,
+                        Members: membersObj,
+                        Messages: currentRoom.messages
+                    }}));
 
-				messages[msgID] = msgObj;
+                    broadcastToRoom(members[UserID].In, {
+                        type: "join", 
+                        content: {
+                            UserID,
+                            UserName: userProfile["UserName"],
+                            Avt: userProfile["Avt"]
+                        }
+                    });
+                    Logs.addEntry(members[UserID].In, "join", UserID);
+                }
+                else {
+                    sendError(client, `Member ${UserID} is already belong to a room.`);
+                }
+            break;
 
-				wss.clients.forEach((c) => {
-					if(c.readyState === ws.OPEN) {
-						const toSendJSON = {
-							type: "message",
-							content: {
-								info: msgObj
-							}
-						}
+            case "message":
+                if(isInRoom) {
+                    const MessageID = sha256Hash(UserID.concat(ContentJSON.content, Object.keys(rooms[members[UserID].In].messages).length.toString()));
+                    const MessageObject = {
+                        Sender: UserID,
+                        Text: ContentJSON.content,
+                        Timestamp: getCurrentTime()
+                    };
+                    
+                    rooms[members[UserID].In].messages[MessageID] = MessageObject;
 
-						c.send(JSON.stringify(toSendJSON));
-					}
-				});
-			}
-			else if(ContentJSON.type === "member") {
-				// Handle user profile/name update
-				users[UserID].UserName = ContentJSON.content;
-				const ContentJSON = {
-					type: "member",
-					content: {
-						UserID,
-						UserName: ContentJSON.content
-					}
-				}
-			}
-            else if(ContentJSON.type === "pause") {
-                // Handle media pause/resume state
-                isPaused = ContentJSON.paused;
-                wss.clients.forEach((c) => {
-                    c.send(ContentJSON.content.toString());
-                });
-            }
-            else if(ContentJSON.type === "media") {
-                // Handle media change event
-                currentMedia = ContentJSON.media;
-                
-            }
-			else {
-				client.send(`Unknown content type: ${ContentJSON.type}.`)
-			}
-		}
-	});
+                    broadcastToRoom(members[UserID].In, {
+                        type: "message",
+                        content: {
+                            MessageID,
+                            MessageObject
+                        }
+                    });
 
-    // Handle client disconnection
-    client.on("close", () => {
-        console.log(`${UserID} disconnected.`)
-        logs.push({
-            event: "disconnection",
-            user: UserID,
-            timestamp: getCurrentTime()
-        });
+                    Logs.addEntry(members[UserID].In, "message", UserID, { text: ContentJSON.content });
+                }
+                else {
+                    sendError(client, `Member ${UserID} does not belong to a room.`);
+                }
+            break;
+
+            case "election":
+                const isMemberBelongToRoom = rooms[members[UserID].In].members.includes(ContentJSON.content);
+                const isMemberAMod = rooms[members[UserID].In].mods.includes(ContentJSON.content);
+                const isMemberHasPermission = members[UserID].In == UserID;
+
+                if(isMemberBelongToRoom && !isMemberAMod && isMemberHasPermission) {
+                    rooms[members[UserID].In].mods.push(ContentJSON.content);
+
+                    broadcastToRoom(members[UserID].In, ContentJSON);
+                    Logs.addEntry(members[UserID].In, "election", ContentJSON.content);
+                }
+                else if(isMemberHasPermission) {
+                    sendError(client, `Insufficient permission.`);
+                }
+                else if(isMemberAMod) {
+                    sendError(client, `Member ${ContentJSON.content} is already a moderator.`);
+                }
+                else {
+                    sendError(client, `Unknown member ${ContentJSON.content}: Member does not exist or does not belong to this room.`);
+                }
+            break;
+            
+            case "leave":
+                if(isInRoom) {
+                    rooms[members[UserID].In].members = rooms[members[UserID].In].members.filter(member => member !== UserID);
+                    broadcastToRoom(members[UserID].In, {type: "leave", content: UserID});
+                    members[UserID].In = "";
+                    Logs.addEntry(members[UserID].In, "leave", UserID);
+                }
+                else {
+                    sendError(client, `Member ${UserID} does not belong to a room.`);
+                }
+            break;
+
+            default:
+                sendError(client, `Unknown request type: ${ContentJSON.type}`);
+            break;
+        }
     });
 });
 
@@ -224,70 +213,126 @@ wss.on("connection", (client, req) => {
  *      type: "pause",
  *      content: false
  *  }
+ * 
+ *  {
+ *      type: "election",
+ *      content: MemberID
+ *  }
  */
 
-// Start HTTP/WebSocket server
 server.listen(PORT, () => {
-	console.log(`Hello World! Server's running at port ${PORT}.`)
+    console.log(`Hello World! Server's running at port: ${PORT}.`)
 });
 
-// Log creation and shutdown handling
-server.on("close", createLog);
+//classes
+const Logs = class {
+    static logs = [
+        /**
+         *  {
+         *      event: "host",
+         *      user: userIP,
+         *      target: roomID
+         *      timestamp: getCurrentTime()
+         *  },
+         *  {
+         *      event: "connection",
+         *      user: userID,
+         *      timestamp: getCurrentTime()
+         *  },
+         *  {
+         *      event: "disconnection",
+         *      user: userID,
+         *      timestamp: getCurrentTime()
+         *  },
+         *  {
+         *      event: "election",
+         *      target: userID,
+         *      timestamp: getCurrentTime()
+         *  },
+         *  {
+         *      event: "message",
+         *      user: userID,
+         *      text: "Hello World!",
+         *      timestamp: getCurrentTime()
+         *  }
+         */
+    ];
 
-server.on('error', (err) => {
-    console.error('Server error:', err);
-    shutdown();
-});
+    /**
+     * 
+     * @param {string} entryType 
+     * @param {string} entryTarget 
+     * @param {object} extras 
+    */
 
-process.on('SIGINT', shutdown);
-process.on('SIGTERM', shutdown);
+    static formatList = {
+        connection: "connected.",
+        disconnection: "disconnected",
+        election: "elected to admin",
+        host: "hosted a new room.",
+        join: "joined.",
+        leave: "left."
+    };
 
-process.on('uncaughtException', (err) => {
-    console.error('Uncaught Exception:', err);
-    shutdown();
-});
+    static generateLogString = (logEntry, suffix) => {
+        return `{${logEntry.roomID}}[${logEntry.timestamp}] ${logEntry.entryTarget}${suffix}\n`;
+    };
 
-process.on('unhandledRejection', (reason) => {
-    console.error('Unhandled Rejection:', reason);
-    shutdown();
-});
+    static addEntry(roomID, entryType, entryTarget, extras = {}) {
+        const allowedEntryType = ["connection", "disconnection", "election", "host", "message", "join", "leave"];
 
-/**
- * Gracefully shuts down the server and writes logs to disk.
- */
-const shutdown = () => {
-    console.log('Shutting down gracefully...');
-    server.close(() => {
-        createLog();
-        console.log('All connections closed, exiting.');
-        process.exit(0);
-    });
-}
-  
+        if(!allowedEntryType.includes(entryType)) {
+            throw new TypeError(`Unknown entryType "${entryType}", please try again.`);
+        }
+
+        const logEntry = {
+            event: entryType,
+            entryTarget,
+            roomID,
+            ...extras,
+            timestamp: getCurrentTime()
+        };
+        Logs.logs.push(logEntry);
+
+        if(logEntry.event === "message") {
+            console.log(Logs.generateLogString(logEntry, `: ${logEntry.text}`));
+        }
+        else {
+            console.log(Logs.generateLogString(logEntry, Logs.formatList[logEntry.event]));
+        }
+    }
+
+    static toString() {
+        let output = "";
+
+        Logs.logs.forEach(log => {
+            if(log.event === "message") {
+                output += Logs.generateLogString(log, `: ${log.text}`);
+            }
+            else {
+                output += Logs.generateLogString(log, Logs.formatList[log.event]);
+            }
+        });
+
+        return output.trim();
+    }
+};
+
 /**
  * Writes the event logs to a uniquely named file in the "logs" directory.
  */
 const createLog = async () => {
     await fs.mkdir("logs", { recursive: true });
-    let logID = sha256Hash(getCurrentTime());
-    let logstring = [];
 
-    logs.forEach((log) => {
-        if(log.event === "connection") {
-            logstring.push(`[${log.timestamp}] ${log.user} connected.`);
-        }
-        else if(log.event === "disconnection") {
-            logstring.push(`[${log.timestamp}] ${log.user} disconnected.`);
-        }
-        else if(log.event === "message") {
-            logstring.push(`[${log.timestamp}] ${log.user}: ${log.text}`);
-        }
-    });
+    const logstring = Logs.toString();
 
-    let fileName = `${logID}.log`;
-    let filePath = path.join("logs", fileName);
+    let
+        logID = sha256Hash(getCurrentTime()),
+        fileName = `${logID}.log`,
+        filePath = path.join("logs", fileName),
+        counter = 1
+    ;
 
-    let counter = 1;
     while(true) {
         try {
             await fs.access(filePath);
@@ -301,14 +346,14 @@ const createLog = async () => {
         }
     }
 
-    await fs.writeFile(filePath, logstring.join("\n"), "utf-8");
+    await fs.writeFile(filePath, logstring, "utf-8");
 };
 
 /**
  * Returns the current time as a formatted string.
  */
 const getCurrentTime = () => {
-	const
+    const
         now = new Date(),
         hours = String(now.getHours()).padStart(2, '0'),
         minutes = String(now.getMinutes()).padStart(2, '0'),
@@ -318,14 +363,33 @@ const getCurrentTime = () => {
         year = now.getFullYear()
     ;
 
-	const formatted = `${hours}:${minutes}:${seconds} ${day}/${month}/${year}`;
+    const formatted = `${hours}:${minutes}:${seconds} ${day}/${month}/${year}`;
 
-	return formatted;
-}
+    return formatted;
+};
 
 /**
  * Returns a SHA-256 hash of the given content.
  */
 const sha256Hash = (content) => {
     return crypto.createHash("sha256").update(content).digest("hex");
-}
+};
+
+const broadcastToRoom = (RoomID, message) => {
+    if(!rooms[RoomID])
+        return;
+
+    rooms[RoomID].members.forEach(memberID => {
+        const member = members[memberID];
+        if(member && member.socket.readyState === ws.OPEN) {
+            member.Socket.send(JSON.stringify(message));
+        }
+    });
+};
+
+const sendError = (client, message) => {
+    client.send(JSON.stringify({
+        type: "error",
+        content: message
+    }));
+};
