@@ -1,31 +1,35 @@
 import React, { useState } from 'react';
-import bannerImage from '../assets/banner.png';
-import { hostRoom } from '../utils/roomManager';
 import { useNavigate } from 'react-router-dom';
-
+import bannerImage from '../assets/banner.png';
 
 const Host = () => {
     const navigate = useNavigate();
 
-    const [roomId, setRoomId] = useState('');
-    const [username, setUsername] = useState('');
+    const [roomInput, setRoomInput] = useState('');
+    const [userInput, setUserInput] = useState('');
     const [fileName, setFileName] = useState('');
     const [videoFile, setVideoFile] = useState(null);
+
     const handleUpload = (e) => {
         const file = e.target.files[0];
         setVideoFile(file);
-        if (file) {
-            setFileName(file.name);
-        }
+        if (file) setFileName(file.name);
     };
 
-    const handleHost = async () => {
-        console.log(`Hosting room #${roomId} as ${username} with ${fileName}`);
-        await hostRoom({ roomId: roomId, username: username, videoFile: videoFile });
-        navigate(`/watch/${roomId}`);
+    const handleHost = () => {
+
+        roomManager.connect();
+
+        setRoomManager(roomManager);
+        setChatManager(chatManager);
+        setRoomId(roomInput);
+        setUsername(userInput);
+        setIsHost(true);
+
+        navigate(`/watch/${roomInput}`);
     };
 
-    const isFormValid = roomId && username && videoFile;
+    const isFormValid = roomInput && userInput && videoFile;
 
     return (
         <section
@@ -33,32 +37,25 @@ const Host = () => {
             style={{ backgroundImage: `url(${bannerImage})` }}
         >
             <div className="max-w-xl mx-auto px-6 text-center bg-white/70 backdrop-blur-sm rounded-lg py-10 space-y-6">
-                <h1 className="text-3xl font-bold font-[var(--font-display)]">
-                    Host a Room
-                </h1>
-
-                {/* Live Sentence */}
+                <h1 className="text-3xl font-bold font-[var(--font-display)]">Host a Room</h1>
                 <p className="text-lg font-medium">
-                    Host room <span className="font-bold text-[var(--color-cyan-500)]">#{roomId || '____'}</span> as <span className="font-bold text-[var(--color-magenta-500)]">{username || '____'}</span>
-                    {fileName && (
-                        <> with <span className="font-bold text-[var(--color-yellow-500)]">{fileName}</span></>
-                    )}
+                    Host room <span className="font-bold text-[var(--color-cyan-500)]">#{roomInput || '____'}</span> as <span className="font-bold text-[var(--color-magenta-500)]">{userInput || '____'}</span>
+                    {fileName && <> with <span className="font-bold text-[var(--color-yellow-500)]">{fileName}</span></>}
                 </p>
 
-                {/* Inputs */}
                 <div className="space-y-4">
                     <input
                         type="text"
                         placeholder="Room ID"
-                        value={roomId}
-                        onChange={(e) => setRoomId(e.target.value)}
+                        value={roomInput}
+                        onChange={(e) => setRoomInput(e.target.value)}
                         className="w-full px-4 py-2 rounded-md border focus:outline-none focus:ring-2 focus:ring-[var(--color-cyan-500)]"
                     />
                     <input
                         type="text"
                         placeholder="Username"
-                        value={username}
-                        onChange={(e) => setUsername(e.target.value)}
+                        value={userInput}
+                        onChange={(e) => setUserInput(e.target.value)}
                         className="w-full px-4 py-2 rounded-md border focus:outline-none focus:ring-2 focus:ring-[var(--color-cyan-500)]"
                     />
                     <input
