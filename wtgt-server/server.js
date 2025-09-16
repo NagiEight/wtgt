@@ -43,17 +43,16 @@ const
     })
 ;
 
-//Runtime Variables
-let 
-
-;
-
 wss.on("connection", (client, req) => {
     const
         userProfile = JSON.parse(req.headers["profile"]),
         IP = req.socket.remoteAddress,
         UserID = sha256Hash(IP)
     ;
+
+    if(Object.keys(members).includes(UserID)) {
+        return;
+    }
 
     Logs.addEntry("", "connection", UserID);
 
@@ -99,7 +98,7 @@ wss.on("connection", (client, req) => {
                     const currentRoom = rooms[ContentJSON.content];
                     const membersObj = {};
 
-                    for (const memberID of currentRoom.members) {
+                    for(const memberID of currentRoom.members) {
                         membersObj[memberID] = {
                             UserName: members[memberID].UserName,
                             Avt: members[memberID].Avt
@@ -115,7 +114,7 @@ wss.on("connection", (client, req) => {
                     }}));
 
                     broadcastToRoom(members[UserID].In, {
-                        type: "join", 
+                        type: "join",
                         content: {
                             UserID,
                             UserName: userProfile["UserName"],
@@ -179,13 +178,44 @@ wss.on("connection", (client, req) => {
             
             case "leave":
                 if(isInRoom) {
-                    rooms[members[UserID].In].members = rooms[members[UserID].In].members.filter(member => member !== UserID);
-                    broadcastToRoom(members[UserID].In, {type: "leave", content: UserID});
-                    members[UserID].In = "";
-                    Logs.addEntry(members[UserID].In, "leave", UserID);
+                    if(UserID === members[UserID].In) {
+                        broadcastToRoom(members[UserID].In, {type: "end", content: UserID});
+
+                        for(const MemberID of rooms[members[UserID].In].members) {
+                            members[MemberID].In = "";
+                        }
+
+                        delete rooms[members[UserID].In];
+                    }
+                    else {
+                        rooms[members[UserID].In].members = rooms[members[UserID].In].members.filter(member => member !== UserID);
+                        broadcastToRoom(members[UserID].In, {type: "leave", content: UserID});
+                        members[UserID].In = "";
+                        Logs.addEntry(members[UserID].In, "leave", UserID);
+                    }
                 }
                 else {
                     sendError(client, `Member ${UserID} does not belong to a room.`);
+                }
+            break;
+
+            case "pause":
+                if(UserID === members[UserID].In) {
+                    rooms[members[UserID].In].isPaused = ContentJSON.content;
+                    broadcastToRoom(members[UserID].In, ContentJSON);
+                }
+                else {
+                    sendError(client, "Insufficient permission.");
+                }
+            break;
+
+            case "sync":
+                if(UserID === members[UserID].In) {
+                    broadcastToRoom(members[UserID].In, ContentJSON);
+                    Logs.addEntry(members[UserID].In, "sync", UserID, { to: ContentJSON.content });
+                }
+                else {
+                    sendError(client, "Insufficient permission.");
                 }
             break;
 
@@ -267,19 +297,20 @@ const Logs = class {
 
     static formatList = {
         connection: "connected.",
-        disconnection: "disconnected",
-        election: "elected to admin",
+        disconnection: "disconnected.",
+        election: "elected to modertor.",
         host: "hosted a new room.",
         join: "joined.",
-        leave: "left."
+        leave: "left.",
+        pause: "paused."
     };
 
     static generateLogString = (logEntry, suffix) => {
         return `{${logEntry.roomID}}[${logEntry.timestamp}] ${logEntry.entryTarget}${suffix}\n`;
     };
 
-    static addEntry(roomID, entryType, entryTarget, extras = {}) {
-        const allowedEntryType = ["connection", "disconnection", "election", "host", "message", "join", "leave"];
+    static addEntry = (roomID, entryType, entryTarget, extras = {}) => {
+        const allowedEntryType = ["connection", "disconnection", "election", "host", "message", "join", "leave", "pause", "sync"];
 
         if(!allowedEntryType.includes(entryType)) {
             throw new TypeError(`Unknown entryType "${entryType}", please try again.`);
@@ -297,17 +328,23 @@ const Logs = class {
         if(logEntry.event === "message") {
             console.log(Logs.generateLogString(logEntry, `: ${logEntry.text}`));
         }
+        else if(logEntry.event === "sync") {
+            console.log(Logs.generateLogString(logEntry, `: Skipped to ${logEntry.to}.`));
+        }
         else {
             console.log(Logs.generateLogString(logEntry, Logs.formatList[logEntry.event]));
         }
     }
 
-    static toString() {
+    static toString = () => {
         let output = "";
 
         Logs.logs.forEach(log => {
             if(log.event === "message") {
                 output += Logs.generateLogString(log, `: ${log.text}`);
+            }
+            else if(logEntry.event === "sync") {
+                output += Logs.generateLogString(logEntry, `: Skipped to ${logEntry.to}.`)
             }
             else {
                 output += Logs.generateLogString(log, Logs.formatList[log.event]);
@@ -316,37 +353,34 @@ const Logs = class {
 
         return output.trim();
     }
-};
 
-/**
- * Writes the event logs to a uniquely named file in the "logs" directory.
- */
-const createLog = async () => {
-    await fs.mkdir("logs", { recursive: true });
-
-    const logstring = Logs.toString();
-
-    let
-        logID = sha256Hash(getCurrentTime()),
-        fileName = `${logID}.log`,
-        filePath = path.join("logs", fileName),
-        counter = 1
-    ;
-
-    while(true) {
-        try {
-            await fs.access(filePath);
-
-            fileName = `${logID}_${counter}.log`;
-            filePath = path.join("logs", fileName);
-            ++counter;
+    static createLog = async () => {
+        await fs.mkdir("logs", { recursive: true });
+    
+        const logstring = Logs.toString();
+    
+        let
+            logID = sha256Hash(getCurrentTime()),
+            fileName = `${logID}.log`,
+            filePath = path.join("logs", fileName),
+            counter = 1
+        ;
+    
+        while(true) {
+            try {
+                await fs.access(filePath);
+    
+                fileName = `${logID}_${counter}.log`;
+                filePath = path.join("logs", fileName);
+                ++counter;
+            }
+            catch {
+                break;
+            }
         }
-        catch {
-            break;
-        }
-    }
-
-    await fs.writeFile(filePath, logstring, "utf-8");
+    
+        await fs.writeFile(filePath, logstring, "utf-8");
+    };
 };
 
 /**
