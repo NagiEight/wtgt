@@ -6,34 +6,34 @@ const ChatPanel = ({ roomNumber = 'Room #1234', username = 'You', roomId = 'defa
     const [input, setInput] = useState('');
     const chatManagerRef = useRef(null);
 
-    useEffect(() => {
-        chatManagerRef.current = chatManager;
+    // useEffect(() => {
+    //     chatManagerRef.current = chatManager;
 
-        // Set up callbacks
-        chatManager
-            .on('onNewMessage', (msg) => {
-                setMessages((prev) => [...prev, {
-                    user: msg.sender,
-                    text: msg.text,
-                    timestamp: msg.timestamp
-                }]);
-            })
-            .on('onHistoryUpdate', (history) => {
-                const formatted = history.map(msg => ({
-                    user: msg.sender,
-                    text: msg.text,
-                    timestamp: msg.timestamp
-                }));
-                setMessages(formatted);
-            });
+    //     // Set up callbacks
+    //     chatManager
+    //         .on('onNewMessage', (msg) => {
+    //             setMessages((prev) => [...prev, {
+    //                 user: msg.sender,
+    //                 text: msg.text,
+    //                 timestamp: msg.timestamp
+    //             }]);
+    //         })
+    //         .on('onHistoryUpdate', (history) => {
+    //             const formatted = history.map(msg => ({
+    //                 user: msg.sender,
+    //                 text: msg.text,
+    //                 timestamp: msg.timestamp
+    //             }));
+    //             setMessages(formatted);
+    //         });
 
-        // Connect to room
-        roomManager.connect();
+    //     // Connect to room
+    //     roomManager.connect();
 
-        return () => {
-            roomManager.disconnect?.(); // If you have a disconnect method
-        };
-    }, [roomId, username]);
+    //     return () => {
+    //         roomManager.disconnect?.(); // If you have a disconnect method
+    //     };
+    // }, [roomId, username]);
 
     const handleSend = () => {
         if (input.trim() && chatManagerRef.current) {

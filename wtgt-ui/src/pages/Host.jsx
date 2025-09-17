@@ -18,15 +18,7 @@ const Host = () => {
 
     const handleHost = () => {
 
-        roomManager.connect();
-
-        setRoomManager(roomManager);
-        setChatManager(chatManager);
-        setRoomId(roomInput);
-        setUsername(userInput);
-        setIsHost(true);
-
-        navigate(`/watch/${roomInput}`);
+        navigate(`/watch?roomId=${roomInput}`);
     };
 
     const isFormValid = roomInput && userInput && videoFile;
