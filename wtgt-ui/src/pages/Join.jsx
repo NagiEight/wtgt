@@ -1,14 +1,17 @@
-import React, { useState } from 'react';
+import React, { useState, useContext } from 'react';
 import bannerImage from '../assets/banner.png'; // Adjust path if needed
-
+import { join } from '../utils/roomManager';
+import { SocketContext } from "../utils/SocketContext";
 
 const Join = () => {
+    const ws = useContext(SocketContext);
     const [roomId, setRoomId] = useState('');
     const [username, setUsername] = useState('');
 
     const handleJoin = async () => {
         // You can redirect or validate here
         console.log(`Joining room #${roomId} as ${username}`);
+        join(roomId);
     };
     return (
         <section

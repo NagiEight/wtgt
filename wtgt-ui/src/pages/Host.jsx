@@ -1,9 +1,11 @@
-import React, { useState } from 'react';
+import React, { useState, useContext } from 'react';
 import { useNavigate } from 'react-router-dom';
 import bannerImage from '../assets/banner.png';
 import { host } from '../utils/roomManager';
-import { initSocket } from '../utils/wsClient';
+import { SocketContext } from "../utils/SocketContext";
 const Host = () => {
+    const ws = useContext(SocketContext);
+
     const navigate = useNavigate();
 
     const [roomInput, setRoomInput] = useState('');
@@ -31,18 +33,12 @@ const Host = () => {
     //     };
     // };
     const handleHost = () => {
-        const ws = initSocket(serverIp); // serverIp should come from state or props
 
+        console.log('WebSocket connection established.');
+        host(videoFile?.name || '');
+
+        navigate(`/watch?roomId=${roomInput}&username=${userInput}`);
         ws.onopen = () => {
-
-            // ws.send(JSON.stringify({
-            //     type: 'host',
-            //     roomId: roomInput,
-            //     username: userInput,
-            //     fileName: videoFile?.name || '',
-            // }));
-            host(videoFile?.name || '', ws);
-            navigate(`/watch?roomId=${roomInput}&username=${userInput}`);
         };
 
         ws.onerror = (err) => {
