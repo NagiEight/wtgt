@@ -4,7 +4,7 @@
  * @param {string} mediaName
  * @param {WebSocket} ws
  */
-const host = async ( mediaName, ws ) => {
+const host = async (mediaName, ws) => {
     ws.send(JSON.stringify({ type: "host", content: mediaName }));
 }
 

@@ -1,7 +1,8 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import bannerImage from '../assets/banner.png';
-
+import { host } from '../utils/roomManager';
+import { initSocket } from '../utils/wsClient';
 const Host = () => {
     const navigate = useNavigate();
 
@@ -9,6 +10,7 @@ const Host = () => {
     const [userInput, setUserInput] = useState('');
     const [fileName, setFileName] = useState('');
     const [videoFile, setVideoFile] = useState(null);
+    const [serverIp, setServerIp] = useState('');
 
     const handleUpload = (e) => {
         const file = e.target.files[0];
@@ -16,9 +18,41 @@ const Host = () => {
         if (file) setFileName(file.name);
     };
 
-    const handleHost = () => {
 
-        navigate(`/watch?roomId=${roomInput}`);
+    // const handleHost = () => {
+    //     // const ws = new WebSocket(`ws://localhost:3000`);
+    //     // host('eeeee.mp4', ws);
+    //     // navigate(`/watch?roomId=${roomInput}&host=true&username=${userInput}`);
+    //     const ws = initSocket(serverIp);
+    //     ws.onopen = () => {
+    //         ws.send(JSON.stringify({ type: "host", content: "fileName.mp4" }));
+    //         console.log(JSON.stringify({ type: "host", content: "fileName.mp4" }));
+    //         navigate(`/watch?roomId=${roomInput}`);
+    //     };
+    // };
+    const handleHost = () => {
+        const ws = initSocket(serverIp); // serverIp should come from state or props
+
+        ws.onopen = () => {
+            ws.send(JSON.stringify({
+                UserName: "Claire Iidea",
+                Avt: "uri"
+            }));
+
+            ws.send(JSON.stringify({
+                type: 'host',
+                roomId: roomInput,
+                username: userInput,
+                fileName: videoFile?.name || '',
+            }));
+
+            navigate(`/watch?roomId=${roomInput}&username=${userInput}`);
+        };
+
+        ws.onerror = (err) => {
+            console.error('WebSocket error:', err);
+            alert('Failed to connect to server. Please check the IP and try again.');
+        };
     };
 
     const isFormValid = roomInput && userInput && videoFile;
@@ -34,6 +68,13 @@ const Host = () => {
                     Host room <span className="font-bold text-[var(--color-cyan-500)]">#{roomInput || '____'}</span> as <span className="font-bold text-[var(--color-magenta-500)]">{userInput || '____'}</span>
                     {fileName && <> with <span className="font-bold text-[var(--color-yellow-500)]">{fileName}</span></>}
                 </p>
+                <input
+                    type="text"
+                    placeholder="Server IP"
+                    value={serverIp}
+                    onChange={(e) => setServerIp(e.target.value)}
+                    className="w-full px-4 py-2 rounded-md border focus:outline-none focus:ring-2 focus:ring-[var(--color-cyan-500)]"
+                />
 
                 <div className="space-y-4">
                     <input
@@ -56,6 +97,7 @@ const Host = () => {
                         onChange={handleUpload}
                         className="w-full px-4 py-2 bg-[var(--color-yellow-100)] rounded-md cursor-pointer"
                     />
+
                     <button
                         onClick={handleHost}
                         disabled={!isFormValid}
