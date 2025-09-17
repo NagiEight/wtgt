@@ -300,13 +300,13 @@ const Logs = class {
      * A list of predefined suffix for most logging event types. Don't mutate this, please.
      */
     static formatList = {
-        connection: "connected.",
-        disconnection: "disconnected.",
-        election: "elected to modertor.",
-        host: "hosted a new room.",
-        join: "joined.",
-        leave: "left.",
-        pause: "paused."
+        connection: " connected.",
+        disconnection: " disconnected.",
+        election: " elected to modertor.",
+        host: " hosted a new room.",
+        join: " joined.",
+        leave: " left.",
+        pause: " paused."
     };
     
     static generateLogString = (logEntry, suffix) => {
