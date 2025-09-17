@@ -34,18 +34,14 @@ const Host = () => {
         const ws = initSocket(serverIp); // serverIp should come from state or props
 
         ws.onopen = () => {
-            ws.send(JSON.stringify({
-                UserName: "Claire Iidea",
-                Avt: "uri"
-            }));
 
-            ws.send(JSON.stringify({
-                type: 'host',
-                roomId: roomInput,
-                username: userInput,
-                fileName: videoFile?.name || '',
-            }));
-
+            // ws.send(JSON.stringify({
+            //     type: 'host',
+            //     roomId: roomInput,
+            //     username: userInput,
+            //     fileName: videoFile?.name || '',
+            // }));
+            host(videoFile?.name || '', ws);
             navigate(`/watch?roomId=${roomInput}&username=${userInput}`);
         };
 
