@@ -38,14 +38,18 @@ const
         */
     },
     server = http.createServer((req, res) => {
-        
+
     }),
     wss = new ws.Server({ server })
 ;
 
 wss.on("connection", (client, req) => {
     const
-        userProfile = JSON.parse(req.headers["profile"]),
+        url = new URL(req.url, `ws://${req.headers.host}`),
+        userProfile = {
+            UserName: url.searchParams.get("UserName"), 
+            Avt: url.searchParams.get("Avt")
+        },
         IP = req.socket.remoteAddress,
         UserID = sha256Hash(IP)
     ;
@@ -57,10 +61,10 @@ wss.on("connection", (client, req) => {
     Logs.addEntry("", "connection", UserID);
 
     members[UserID] = {
-        UserName: userProfile["UserName"],
+        UserName: userProfile.UserName,
         In: "",
         Socket: client,
-        Avt: userProfile["Avt"]
+        Avt: userProfile.Avt
     }
 
     client.on("close", () => {
@@ -362,7 +366,7 @@ const Logs = class {
     }
 
     /**
-     * Create a log file at
+     * Create a log file at logs.
      */
     static createLog = async () => {
         await fs.mkdir("logs", { recursive: true });
