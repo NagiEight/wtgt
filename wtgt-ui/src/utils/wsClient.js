@@ -4,13 +4,7 @@ let socket = null;
 export const initSocket = (serverIp) => {
     if (!socket || socket.readyState === WebSocket.CLOSED) {
         // socket = new WebSocket(`ws://localhost:3000`); // Replace with your server address
-
-        const test = {
-            UserName: "Claire Iidea",
-            Avt: "uri"
-        }
-
-        socket = new WebSocket(`http://localhost:3000?handshake=${JSON.stringify(test)}`);
+        socket = new WebSocket(`http://localhost:3000?UserName=Claire%20Iidea&Avt=uri`); // Replace with your server address
     }
 
     return socket;
