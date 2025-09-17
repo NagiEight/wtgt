@@ -5,7 +5,7 @@ let ws = null;
 export const initSocket = (serverIp) => {
     if (!ws || ws.readyState === WebSocket.CLOSED) {
         // socket = new WebSocket(`ws://localhost:3000`); // Replace with your server address
-        ws = new WebSocket(`ws://localhost:3000`); // Replace with your server address
+        ws = new WebSocket(serverIp); // Replace with your server address
     }
     return ws;
 };
@@ -32,6 +32,15 @@ const join = async (roomID) => {
     ws.send(JSON.stringify({ type: "join", content: roomID }));
 }
 
+/**
+ * @param {string} roomID
+ * @param {string} serverIp
+ */
+const joinIp = async (roomID, serverIp) => {
+    new WebSocket(serverIp).send(JSON.stringify({ type: "join", content: roomID }));
+}
+
+
 const leave = () => {
     ws.send(JSON.stringify({ type: "leave" }));
 }
@@ -39,5 +48,6 @@ const leave = () => {
 export {
     host,
     join,
+    joinIp
 
 }

@@ -10,7 +10,7 @@ import { initSocket } from './utils/roomManager';
 import { createContext } from "react";
 import { SocketContext } from "./utils/SocketContext";
 
-const ws = initSocket("localhost:3000"); // serverIp should come from state or props
+const ws = initSocket("ws://localhost:3000"); // serverIp should come from state or props
 function App() {
   return (
     <SocketContext.Provider value={ws}>
