@@ -16,10 +16,10 @@ const Banner = () => {
     };
 
     const handleConnect = () => {
-        if (!isValidAddress(serverIP)) {
-            setError("this isn't a valid ip address, try again.");
-            return;
-        }
+        // if (!isValidAddress(serverIP)) {
+        //     setError("this isn't a valid ip address, try again.");
+        //     return;
+        // }
 
         setError('');
         const formattedIP = serverIP.startsWith('ws://') ? serverIP : `ws://${serverIP}`;

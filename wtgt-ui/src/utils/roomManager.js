@@ -7,6 +7,9 @@ export const initSocket = (serverIp) => {
         // socket = new WebSocket(`ws://localhost:3000`); // Replace with your server address
         ws = new WebSocket(serverIp); // Replace with your server address
     }
+    ws.onopen = () => {
+        console.log('WebSocket connection established.');
+    }
     return ws;
 };
 
