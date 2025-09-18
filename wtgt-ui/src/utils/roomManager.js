@@ -1,7 +1,7 @@
 // @ts-check
 // wsClient.js
 let ws = null;
-
+let mediaName = '';
 export const initSocket = (serverIp) => {
     if (!ws || ws.readyState === WebSocket.CLOSED) {
         // socket = new WebSocket(`ws://localhost:3000`); // Replace with your server address
@@ -45,9 +45,13 @@ const join = async (roomID) => {
     }
 
     ws.onmessage = (message) => {
-        const mediaName = JSON.parse(message.data.content.CurrentMedia);
+        mediaName = JSON.parse(message.data).content.CurrentMedia;
         console.log('Received message:', mediaName);
     }
+}
+
+const getMediaName = () => {
+    return mediaName;
 }
 
 
@@ -58,4 +62,6 @@ const leave = () => {
 export {
     host,
     join,
+    leave,
+    getMediaName
 }

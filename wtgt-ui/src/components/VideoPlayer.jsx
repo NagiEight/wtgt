@@ -4,8 +4,12 @@ import {
     SpeakerWaveIcon, Cog6ToothIcon, ArrowsPointingOutIcon,
     RectangleStackIcon, TvIcon, ArrowDownTrayIcon
 } from '@heroicons/react/24/outline';
-
+import { getSocket } from '../utils/roomManager';
 const VideoPlayer = ({ src }) => {
+    const ws = getSocket();
+    ws.onmessage = (message) => {
+        console.log('Received message in VideoPlayer:', message.data);
+    }
     return (
         <>
             {/* Video Display */}
