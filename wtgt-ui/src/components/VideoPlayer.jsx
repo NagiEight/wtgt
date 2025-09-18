@@ -4,12 +4,25 @@ import {
     SpeakerWaveIcon, Cog6ToothIcon, ArrowsPointingOutIcon,
     RectangleStackIcon, TvIcon, ArrowDownTrayIcon
 } from '@heroicons/react/24/outline';
-import { getSocket } from '../utils/roomManager';
+import { useLocation } from 'react-router-dom';
+import { useEffect } from 'react';
+import { getSocket, leave } from '../utils/roomManager';
 const VideoPlayer = ({ src }) => {
     const ws = getSocket();
-    ws.onmessage = (message) => {
-        console.log('Received message in VideoPlayer:', message.data);
-    }
+    const location = useLocation();
+
+    useEffect(() => {
+        const currentUrl = location.pathname + location.search;
+
+        return () => {
+            if (currentUrl.startsWith('/watch')) {
+                // Trigger your cleanup or tracking function here
+                console.log('Navigating away from /watch — trigger cleanup');
+                // Example: stop streaming, save progress, notify server, etc.
+                leave();
+            }
+        };
+    }, [location]);
     return (
         <>
             {/* Video Display */}

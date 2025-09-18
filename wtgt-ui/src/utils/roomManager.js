@@ -1,7 +1,10 @@
 // @ts-check
 // wsClient.js
+
+// import { useNavigate } from "react-router-dom";
 let ws = null;
 let mediaName = '';
+// const navigate = useNavigate();
 export const initSocket = (serverIp) => {
     if (!ws || ws.readyState === WebSocket.CLOSED) {
         // socket = new WebSocket(`ws://localhost:3000`); // Replace with your server address
@@ -16,6 +19,7 @@ export const initSocket = (serverIp) => {
 export const getSocket = () => {
     if (!ws || ws.readyState !== WebSocket.OPEN) {
         console.warn('WebSocket not ready. Call initSocket first.');
+        // navigate('/');
         return null;
     }
     return ws;
@@ -56,7 +60,11 @@ const getMediaName = () => {
 
 
 const leave = () => {
+    console.log('sending: ', JSON.stringify({ type: "leave" }));
     ws.send(JSON.stringify({ type: "leave" }));
+    ws.onmessage = (message) => {
+        console.log('Received message:', message.data);
+    }
 }
 
 export {
