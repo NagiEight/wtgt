@@ -25,14 +25,24 @@ export const getSocket = () => {
  * @param {string} mediaName
  */
 const host = async (mediaName) => {
+    console.log('sending: ', JSON.stringify({ type: "host", content: mediaName }));
     ws.send(JSON.stringify({ type: "host", content: mediaName }));
+    ws.onerror = (err) => {
+        console.error('WebSocket error:', err);
+        alert('Failed to connect to server. Please check the IP and try again.');
+    }
 }
 
 /**
  * @param {string} roomID
  */
 const join = async (roomID) => {
+    console.log('sending: ', JSON.stringify({ type: "join", content: roomID }));
     ws.send(JSON.stringify({ type: "join", content: roomID }));
+    ws.onerror = (err) => {
+        console.error('WebSocket error:', err);
+        alert('Failed to connect to server. Please check the IP and try again.');
+    }
 }
 
 
