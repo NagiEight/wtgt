@@ -43,194 +43,205 @@ const
     wss = new ws.Server({ server })
 ;
 
-wss.on("connection", (client, req) => {
-    const
-        url = new URL(req.url, `ws://${req.headers.host}`),
-        userProfile = {
-            UserName: url.searchParams.get("UserName"), 
-            Avt: url.searchParams.get("Avt")
-        },
-        IP = req.socket.remoteAddress,
-        UserID = sha256Hash(IP)
-    ;
+try {
 
-    if(Object.keys(members).includes(UserID)) {
-        return;
-    }
-
-    Logs.addEntry("", "connection", UserID);
-
-    members[UserID] = {
-        UserName: userProfile.UserName,
-        In: "",
-        Socket: client,
-        Avt: userProfile.Avt
-    }
-
-    client.on("close", () => {
-        Logs.addEntry("", "disconnection", UserID);
-        delete members[UserID];
-    });
-
-    client.on("message", (message) => {
-        const ContentJSON = JSON.parse(message.toString());
-        const isInRoom = members[UserID].In !== "";
-
-        switch(ContentJSON.type) {
-            case "host":
-                if(!isInRoom) {
-                    members[UserID].In = UserID;
-                    rooms[UserID] = {
-                        currentMedia: ContentJSON.content.MediaName,
-                        isPaused: ContentJSON.content.IsPaused,
-                        mods: [],
-                        members: [UserID],
-                        messages: {}
-                    }
-                    Logs.addEntry(UserID, "host", UserID);
-                }
-                else {
-                    sendError(client, `Member ${UserID} is already belong to a room.`);
-                }
-            break;
-
-            case "join":
-                if(!isInRoom) {
-                    rooms[ContentJSON.content].members.push(UserID);
-                    members[UserID].In = ContentJSON.content;
-
-                    const currentRoom = rooms[ContentJSON.content];
-                    const membersObj = {};
-
-                    for(const memberID of currentRoom.members) {
-                        membersObj[memberID] = {
-                            UserName: members[memberID].UserName,
-                            Avt: members[memberID].Avt
-                        };
-                    }
-
-                    client.send(JSON.stringify({type: "init", content: {
-                        CurrentMedia: currentRoom.MediaName,
-                        IsPaused: currentRoom.IsPaused,
-                        Mods: currentRoom.mods,
-                        Members: membersObj,
-                        Messages: currentRoom.messages
-                    }}));
-
-                    broadcastToRoom(members[UserID].In, {
-                        type: "join",
-                        content: {
-                            UserID,
-                            UserName: userProfile["UserName"],
-                            Avt: userProfile["Avt"]
+    wss.on("connection", (client, req) => {
+        const
+            url = new URL(req.url, `ws://${req.headers.host}`),
+            userProfile = {
+                UserName: url.searchParams.get("UserName"), 
+                Avt: url.searchParams.get("Avt")
+            },
+            IP = req.socket.remoteAddress,
+            UserID = sha256Hash(IP)
+        ;
+    
+        if(Object.keys(members).includes(UserID)) {
+            return;
+        }
+    
+        Logs.addEntry("", "connection", UserID);
+    
+        members[UserID] = {
+            UserName: userProfile.UserName,
+            In: "",
+            Socket: client,
+            Avt: userProfile.Avt
+        }
+    
+        client.on("close", () => {
+            Logs.addEntry("", "disconnection", UserID);
+            delete members[UserID];
+        });
+    
+    
+        client.on("message", (message) => {
+            const ContentJSON = JSON.parse(message.toString());
+            const isInRoom = members[UserID].In !== "";
+    
+            switch(ContentJSON.type) {
+                case "host":
+                    if(!isInRoom) {
+                        members[UserID].In = UserID;
+                        rooms[UserID] = {
+                            currentMedia: ContentJSON.content.MediaName,
+                            isPaused: ContentJSON.content.IsPaused,
+                            mods: [],
+                            members: [UserID],
+                            messages: {}
                         }
-                    });
-                    Logs.addEntry(members[UserID].In, "join", UserID);
-                }
-                else {
-                    sendError(client, `Member ${UserID} is already belong to a room.`);
-                }
-            break;
-
-            case "message":
-                if(isInRoom) {
-                    const MessageID = sha256Hash(UserID + ContentJSON.content + Object.keys(rooms[members[UserID].In].messages).length.toString());
-                    const MessageObject = {
-                        Sender: UserID,
-                        Text: ContentJSON.content,
-                        Timestamp: getCurrentTime()
-                    };
-                     
-                    rooms[members[UserID].In].messages[MessageID] = MessageObject;
-
-                    broadcastToRoom(members[UserID].In, {
-                        type: "message",
-                        content: {
-                            MessageID,
-                            MessageObject
-                        }
-                    });
-
-                    Logs.addEntry(members[UserID].In, "message", UserID, { text: ContentJSON.content });
-                }
-                else {
-                    sendError(client, `Member ${UserID} does not belong to a room.`);
-                }
-            break;
-
-            case "election":
-                const isMemberBelongToRoom = rooms[members[UserID].In].members.includes(ContentJSON.content);
-                const isMemberAMod = rooms[members[UserID].In].mods.includes(ContentJSON.content);
-                const isMemberHasPermission = members[UserID].In == UserID;
-
-                if(isMemberBelongToRoom && !isMemberAMod && isMemberHasPermission) {
-                    rooms[members[UserID].In].mods.push(ContentJSON.content);
-
-                    broadcastToRoom(members[UserID].In, ContentJSON);
-                    Logs.addEntry(members[UserID].In, "election", ContentJSON.content);
-                }
-                else if(isMemberHasPermission) {
-                    sendError(client, `Insufficient permission.`);
-                }
-                else if(isMemberAMod) {
-                    sendError(client, `Member ${ContentJSON.content} is already a moderator.`);
-                }
-                else {
-                    sendError(client, `Unknown member ${ContentJSON.content}: Member does not exist or does not belong to this room.`);
-                }
-            break;
-            
-            case "leave":
-                if(isInRoom) {
-                    if(UserID === members[UserID].In) {
-                        broadcastToRoom(members[UserID].In, {type: "end"});
-
-                        for(const MemberID of rooms[members[UserID].In].members) {
-                            members[MemberID].In = "";
-                        }
-
-                        delete rooms[members[UserID].In];
+                        Logs.addEntry(UserID, "host", UserID);
                     }
                     else {
-                        rooms[members[UserID].In].members = rooms[members[UserID].In].members.filter(member => member !== UserID);
-                        broadcastToRoom(members[UserID].In, {type: "leave", content: UserID});
-                        members[UserID].In = "";
-                        Logs.addEntry(members[UserID].In, "leave", UserID);
+                        sendError(client, `Member ${UserID} is already belong to a room.`);
                     }
-                }
-                else {
-                    sendError(client, `Member ${UserID} does not belong to a room.`);
-                }
-            break;
+                break;
+    
+                case "join":
+                    if(!Object.keys(rooms).includes(ContentJSON.content)) {
+                        sendError(client, `Unknown room ${ContentJSON.content}.`);
+                        return;
+                    }
 
-            case "pause":
-                if(UserID === members[UserID].In) {
-                    rooms[members[UserID].In].isPaused = ContentJSON.content;
-                    broadcastToRoom(members[UserID].In, ContentJSON);
-                    Logs.addEntry(members[UserID].In, "pause", UserID);
-                }
-                else {
-                    sendError(client, "Insufficient permission.");
-                }
-            break;
-
-            case "sync":
-                if(UserID === members[UserID].In) {
-                    broadcastToRoom(members[UserID].In, ContentJSON);
-                    Logs.addEntry(members[UserID].In, "sync", UserID, { to: ContentJSON.content });
-                }
-                else {
-                    sendError(client, "Insufficient permission.");
-                }
-            break;
-
-            default:
-                sendError(client, `Unknown request type: ${ContentJSON.type}`);
-            break;
-        }
+                    if(!isInRoom) {
+                        rooms[ContentJSON.content].members.push(UserID);
+                        members[UserID].In = ContentJSON.content;
+    
+                        const currentRoom = rooms[ContentJSON.content];
+                        const membersObj = {};
+    
+                        for(const memberID of currentRoom.members) {
+                            membersObj[memberID] = {
+                                UserName: members[memberID].UserName,
+                                Avt: members[memberID].Avt
+                            };
+                        }
+    
+                        client.send(JSON.stringify({type: "init", content: {
+                            CurrentMedia: currentRoom.MediaName,
+                            IsPaused: currentRoom.IsPaused,
+                            Mods: currentRoom.mods,
+                            Members: membersObj,
+                            Messages: currentRoom.messages
+                        }}));
+    
+                        broadcastToRoom(members[UserID].In, {
+                            type: "join",
+                            content: {
+                                UserID,
+                                UserName: userProfile["UserName"],
+                                Avt: userProfile["Avt"]
+                            }
+                        });
+                        Logs.addEntry(members[UserID].In, "join", UserID);
+                    }
+                    else {
+                        sendError(client, `Member ${UserID} is already belong to a room.`);
+                    }
+                break;
+    
+                case "message":
+                    if(isInRoom) {
+                        const MessageID = sha256Hash(UserID + ContentJSON.content + Object.keys(rooms[members[UserID].In].messages).length.toString());
+                        const MessageObject = {
+                            Sender: UserID,
+                            Text: ContentJSON.content,
+                            Timestamp: getCurrentTime()
+                        };
+                         
+                        rooms[members[UserID].In].messages[MessageID] = MessageObject;
+    
+                        broadcastToRoom(members[UserID].In, {
+                            type: "message",
+                            content: {
+                                MessageID,
+                                MessageObject
+                            }
+                        });
+    
+                        Logs.addEntry(members[UserID].In, "message", UserID, { text: ContentJSON.content });
+                    }
+                    else {
+                        sendError(client, `Member ${UserID} does not belong to a room.`);
+                    }
+                break;
+    
+                case "election":
+                    const isMemberBelongToRoom = rooms[members[UserID].In].members.includes(ContentJSON.content);
+                    const isMemberAMod = rooms[members[UserID].In].mods.includes(ContentJSON.content);
+                    const isMemberHasPermission = members[UserID].In == UserID;
+    
+                    if(isMemberBelongToRoom && !isMemberAMod && isMemberHasPermission) {
+                        rooms[members[UserID].In].mods.push(ContentJSON.content);
+    
+                        broadcastToRoom(members[UserID].In, ContentJSON);
+                        Logs.addEntry(members[UserID].In, "election", ContentJSON.content);
+                    }
+                    else if(isMemberHasPermission) {
+                        sendError(client, `Insufficient permission.`);
+                    }
+                    else if(isMemberAMod) {
+                        sendError(client, `Member ${ContentJSON.content} is already a moderator.`);
+                    }
+                    else {
+                        sendError(client, `Unknown member ${ContentJSON.content}: Member does not exist or does not belong to this room.`);
+                    }
+                break;
+                
+                case "leave":
+                    if(isInRoom) {
+                        if(UserID === members[UserID].In) {
+                            broadcastToRoom(members[UserID].In, {type: "end"});
+    
+                            for(const MemberID of rooms[members[UserID].In].members) {
+                                members[MemberID].In = "";
+                            }
+    
+                            delete rooms[members[UserID].In];
+                        }
+                        else {
+                            rooms[members[UserID].In].members = rooms[members[UserID].In].members.filter(member => member !== UserID);
+                            broadcastToRoom(members[UserID].In, {type: "leave", content: UserID});
+                            members[UserID].In = "";
+                            Logs.addEntry(members[UserID].In, "leave", UserID);
+                        }
+                    }
+                    else {
+                        sendError(client, `Member ${UserID} does not belong to a room.`);
+                    }
+                break;
+    
+                case "pause":
+                    if(UserID === members[UserID].In) {
+                        rooms[members[UserID].In].isPaused = ContentJSON.content;
+                        broadcastToRoom(members[UserID].In, ContentJSON);
+                        Logs.addEntry(members[UserID].In, "pause", UserID);
+                    }
+                    else {
+                        sendError(client, "Insufficient permission.");
+                    }
+                break;
+    
+                case "sync":
+                    if(UserID === members[UserID].In) {
+                        broadcastToRoom(members[UserID].In, ContentJSON);
+                        Logs.addEntry(members[UserID].In, "sync", UserID, { to: ContentJSON.content });
+                    }
+                    else {
+                        sendError(client, "Insufficient permission.");
+                    }
+                break;
+    
+                default:
+                    sendError(client, `Unknown request type: ${ContentJSON.type}`);
+                break;
+            }
+        });
     });
-});
-
+}
+catch(err) {
+    console.log(err);
+}
 
 server.listen(PORT, () => {
     console.log(`Hello World! Server's running at port: ${PORT}.`)
@@ -253,7 +264,8 @@ const Logs = class {
         host: " hosted a new room.",
         join: " joined.",
         leave: " left.",
-        pause: " paused."
+        pause: " paused.",
+        error: ""
     };
     
     static generateLogString = (logEntry, suffix) => {
@@ -264,7 +276,7 @@ const Logs = class {
      * Add a new entry to the logs.
      */
     static addEntry = (roomID, entryType, entryTarget, extras = {}) => {
-        const allowedEntryType = ["connection", "disconnection", "election", "host", "message", "join", "leave", "pause", "sync"];
+        const allowedEntryType = ["connection", "disconnection", "election", "host", "message", "join", "leave", "pause", "sync", "error"];
 
         if(!allowedEntryType.includes(entryType)) {
             throw new TypeError(`Unknown entryType "${entryType}", please try again.`);
