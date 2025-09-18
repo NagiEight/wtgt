@@ -43,6 +43,11 @@ const join = async (roomID) => {
         console.error('WebSocket error:', err);
         alert('Failed to connect to server. Please check the IP and try again.');
     }
+
+    ws.onmessage = (message) => {
+        const mediaName = JSON.parse(message.data.content.CurrentMedia);
+        console.log('Received message:', mediaName);
+    }
 }
 
 

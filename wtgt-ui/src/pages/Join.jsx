@@ -1,9 +1,11 @@
 import React, { useState, useContext } from 'react';
 import bannerImage from '../assets/banner.png'; // Adjust path if needed
 import { getSocket, initSocket, join } from '../utils/roomManager';
+import { useNavigate } from 'react-router-dom';
 // import { SocketContext } from "../utils/SocketContext";
 
 const Join = () => {
+    const navigate = useNavigate();
     const ws = getSocket();
     const [roomId, setRoomId] = useState('');
     const [username, setUsername] = useState('');
@@ -13,6 +15,7 @@ const Join = () => {
         // You can redirect or validate here
         console.log(`Joining room #${roomId} as ${username}`);
         join(roomId, serverIp);
+        navigate(`/watch?roomId=${roomId}&host=false&username=${username}`);
     };
     return (
         <section

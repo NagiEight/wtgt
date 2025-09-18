@@ -14,7 +14,7 @@ const VideoPanel = () => {
 
     return (
         <div className="flex-1 p-6 flex flex-col space-y-4">
-            {!videoSrc ? (
+            {/* {!videoSrc ? (
                 <div className="flex flex-col items-center justify-center h-[60vh] bg-white rounded-lg shadow-md border-2 border-dashed border-[var(--color-cyan-300)]">
                     <p className="text-lg mb-4">Upload a video to start hosting</p>
                     <input
@@ -25,8 +25,9 @@ const VideoPanel = () => {
                     />
                 </div>
             ) : (
-                <VideoPlayer src={videoSrc} />
-            )}
+                
+            )} */}
+            <VideoPlayer src={videoSrc} />
         </div>
     );
 };
