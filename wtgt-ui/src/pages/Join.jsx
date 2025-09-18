@@ -1,10 +1,10 @@
 import React, { useState, useContext } from 'react';
 import bannerImage from '../assets/banner.png'; // Adjust path if needed
-import { initSocket, join, joinIp } from '../utils/roomManager';
+import { getSocket, initSocket, join } from '../utils/roomManager';
 // import { SocketContext } from "../utils/SocketContext";
 
 const Join = () => {
-    // const ws = useContext(SocketContext);
+    const ws = getSocket();
     const [roomId, setRoomId] = useState('');
     const [username, setUsername] = useState('');
     const [serverIp, setServerIp] = useState('');
@@ -12,8 +12,7 @@ const Join = () => {
     const handleJoin = async () => {
         // You can redirect or validate here
         console.log(`Joining room #${roomId} as ${username}`);
-        console.log(`Server IP: ${serverIp}`);
-        joinIp(roomId, serverIp);
+        join(roomId, serverIp);
     };
     return (
         <section
@@ -32,13 +31,6 @@ const Join = () => {
 
                 {/* Input Fields */}
                 <div className="space-y-4">
-                    <input
-                        type="text"
-                        placeholder="Server IP"
-                        value={serverIp}
-                        onChange={(e) => setServerIp(e.target.value)}
-                        className="w-full px-4 py-2 rounded-md border focus:outline-none focus:ring-2 focus:ring-[var(--color-cyan-500)]"
-                    />
                     <input
                         type="text"
                         placeholder="Room ID"

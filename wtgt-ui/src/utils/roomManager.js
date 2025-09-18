@@ -32,14 +32,6 @@ const join = async (roomID) => {
     ws.send(JSON.stringify({ type: "join", content: roomID }));
 }
 
-/**
- * @param {string} roomID
- * @param {string} serverIp
- */
-const joinIp = async (roomID, serverIp) => {
-    new WebSocket(serverIp).send(JSON.stringify({ type: "join", content: roomID }));
-}
-
 
 const leave = () => {
     ws.send(JSON.stringify({ type: "leave" }));
@@ -48,6 +40,4 @@ const leave = () => {
 export {
     host,
     join,
-    joinIp
-
 }

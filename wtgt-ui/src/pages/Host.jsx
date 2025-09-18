@@ -2,10 +2,9 @@ import React, { useState, useContext } from 'react';
 import { useNavigate } from 'react-router-dom';
 import bannerImage from '../assets/banner.png';
 import { host } from '../utils/roomManager';
-import { SocketContext } from "../utils/SocketContext";
+import { getSocket } from '../utils/roomManager';
 const Host = () => {
-    const ws = useContext(SocketContext);
-
+    const ws = getSocket();
     const navigate = useNavigate();
 
     const [roomInput, setRoomInput] = useState('');
@@ -60,13 +59,6 @@ const Host = () => {
                     Host room <span className="font-bold text-[var(--color-cyan-500)]">#{roomInput || '____'}</span> as <span className="font-bold text-[var(--color-magenta-500)]">{userInput || '____'}</span>
                     {fileName && <> with <span className="font-bold text-[var(--color-yellow-500)]">{fileName}</span></>}
                 </p>
-                <input
-                    type="text"
-                    placeholder="Server IP"
-                    value={serverIp}
-                    onChange={(e) => setServerIp(e.target.value)}
-                    className="w-full px-4 py-2 rounded-md border focus:outline-none focus:ring-2 focus:ring-[var(--color-cyan-500)]"
-                />
 
                 <div className="space-y-4">
                     <input

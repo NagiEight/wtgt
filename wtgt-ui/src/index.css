@@ -7,24 +7,10 @@
 @theme light {
   --font-display: "Satoshi", "sans-serif";
   --breakpoint-3xl: 120rem;
-
-  /* CMYK-inspired color tokens */
-  --color-cyan-100: rgb(224, 255, 255);
-  /* light cyan */
   --color-cyan-500: rgb(0, 183, 235);
-  /* base cyan */
-  --color-magenta-100: rgb(255, 224, 255);
-  /* light magenta */
   --color-magenta-500: rgb(235, 0, 183);
-  /* base magenta */
-  --color-yellow-100: rgb(255, 255, 224);
-  /* light yellow */
   --color-yellow-500: rgb(255, 235, 0);
-  /* base yellow */
-  --color-black-100: rgb(224, 224, 224);
-  /* light black (gray) */
   --color-black-500: rgb(0, 0, 0);
-  /* true black */
 
   /* Optional: CMYK composite tones */
   --color-cmyk-deep-purple: rgb(102, 0, 153);
