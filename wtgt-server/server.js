@@ -140,7 +140,7 @@ wss.on("connection", (client, req) => {
                         Text: ContentJSON.content,
                         Timestamp: getCurrentTime()
                     };
-                    
+                     
                     rooms[members[UserID].In].messages[MessageID] = MessageObject;
 
                     broadcastToRoom(members[UserID].In, {
@@ -231,29 +231,6 @@ wss.on("connection", (client, req) => {
     });
 });
 
-/**
- * Example WebSocket message formats:
- * 
- *  {
- *      type: "message",
- *      content: "hello world!"
- *  }
- * 
- *  {
- *      type: "member",
- *      content: "Claire Iidea" 
- *  }
- * 
- *  {
- *      type: "pause",
- *      content: false
- *  }
- * 
- *  {
- *      type: "election",
- *      content: MemberID
- *  }
- */
 
 server.listen(PORT, () => {
     console.log(`Hello World! Server's running at port: ${PORT}.`)
@@ -264,37 +241,7 @@ const Logs = class {
     /**
      * Server's log. Use addEntry instead of mutating this directly.
      */
-    static logs = [
-        /**
-         *  {
-         *      event: "host",
-         *      user: userIP,
-         *      target: roomID
-         *      timestamp: getCurrentTime()
-         *  },
-         *  {
-         *      event: "connection",
-         *      user: userID,
-         *      timestamp: getCurrentTime()
-         *  },
-         *  {
-         *      event: "disconnection",
-         *      user: userID,
-         *      timestamp: getCurrentTime()
-         *  },
-         *  {
-         *      event: "election",
-         *      target: userID,
-         *      timestamp: getCurrentTime()
-         *  },
-         *  {
-         *      event: "message",
-         *      user: userID,
-         *      text: "Hello World!",
-         *      timestamp: getCurrentTime()
-         *  }
-         */
-    ];
+    static logs = [];
 
     /**
      * A list of predefined suffix for most logging event types. Don't mutate this, please.
@@ -315,11 +262,7 @@ const Logs = class {
     
     /**
      * Add a new entry to the logs.
-     * 
-     * @param {string} entryType 
-     * @param {string} entryTarget 
-     * @param {object} extras 
-    */
+     */
     static addEntry = (roomID, entryType, entryTarget, extras = {}) => {
         const allowedEntryType = ["connection", "disconnection", "election", "host", "message", "join", "leave", "pause", "sync"];
 
@@ -407,7 +350,7 @@ const getCurrentTime = () => {
         minutes = String(now.getMinutes()).padStart(2, '0'),
         seconds = String(now.getSeconds()).padStart(2, '0'),
         day = String(now.getDate()).padStart(2, '0'),
-        month = String(now.getMonth() + 1).padStart(2, '0'), 
+        month = String(now.getMonth() + 1).padStart(2, '0'),
         year = now.getFullYear()
     ;
 
@@ -426,11 +369,13 @@ const sha256Hash = (content) => {
 const broadcastToRoom = (RoomID, message) => {
     if(!rooms[RoomID])
         return;
-
+    
     rooms[RoomID].members.forEach(memberID => {
         const member = members[memberID];
-        if(member && member.socket.readyState === ws.OPEN) {
-            member.Socket.send(JSON.stringify(message));
+        if(member && member.socket) {
+            if(member.socket.readyState === ws.OPEN) {
+                member.Socket.send(JSON.stringify(message));
+            }
         }
     });
 };
