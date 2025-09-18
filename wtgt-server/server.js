@@ -8,7 +8,7 @@ const
 ;
 
 //Constants
-const 
+const
     PORT = 3000,
     rooms = {
         /**
@@ -44,7 +44,6 @@ const
 ;
 
 try {
-
     wss.on("connection", (client, req) => {
         const
             url = new URL(req.url, `ws://${req.headers.host}`),
@@ -59,7 +58,12 @@ try {
         if(Object.keys(members).includes(UserID)) {
             return;
         }
-    
+        
+        client.send(JSON.stringify({
+            type: "info",
+            content: UserID
+        }));
+
         Logs.addEntry("", "connection", UserID);
     
         members[UserID] = {
@@ -192,12 +196,13 @@ try {
                     if(isInRoom) {
                         if(UserID === members[UserID].In) {
                             broadcastToRoom(members[UserID].In, {type: "end"});
-    
+                            const RoomID = members[UserID].In;
+
                             for(const MemberID of rooms[members[UserID].In].members) {
                                 members[MemberID].In = "";
                             }
     
-                            delete rooms[members[UserID].In];
+                            delete rooms[RoomID];
                         }
                         else {
                             rooms[members[UserID].In].members = rooms[members[UserID].In].members.filter(member => member !== UserID);
