@@ -47,9 +47,16 @@ const Banner = () => {
                             type="text"
                             value={serverIP}
                             onChange={(e) => setServerIP(e.target.value)}
+                            onKeyDown={(e) => {
+                                if (e.key === 'Enter') {
+                                    e.preventDefault();
+                                    handleConnect();
+                                }
+                            }}
                             placeholder="Enter Server IP"
                             className="flex-1 px-4 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-[var(--color-cyan-500)]"
                         />
+
                         <button
                             onClick={handleConnect}
                             className="px-6 py-2 bg-[var(--color-magenta-500)] text-white rounded-md font-semibold hover:bg-[var(--color-cyan-500)] transition"
