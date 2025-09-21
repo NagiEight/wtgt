@@ -27,7 +27,7 @@
     },
     {
         "type": "sync",
-        "content": "1:20"
+        "content": 100
     },
     {
         "type": "pause",

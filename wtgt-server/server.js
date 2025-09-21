@@ -85,6 +85,11 @@ try {
     
             switch(ContentJSON.type) {
                 case "host":
+                    if(!validateMessage(ContentJSON.content, { MediaName: "test", IsPaused: true })) {
+                        sendError(client, `Invalid message format for ${ContentJSON.type}.`);
+                        break;
+                    }
+
                     if(!isInRoom) {
                         members[UserID].In = UserID;
                         rooms[UserID] = {
@@ -102,6 +107,11 @@ try {
                 break;
     
                 case "join":
+                    if(!validateMessage(ContentJSON.content, "test")) {
+                        sendError(client, `Invalid message format for ${ContentJSON.type}.`);
+                        break;
+                    }
+
                     if(!Object.keys(rooms).includes(ContentJSON.content)) {
                         sendError(client, `Unknown room ${ContentJSON.content}.`);
                         return;
@@ -145,6 +155,11 @@ try {
                 break;
     
                 case "message":
+                    if(!validateMessage(ContentJSON.content, "test")) {
+                        sendError(client, `Invalid message format for ${ContentJSON.type}.`);
+                        break;
+                    }
+
                     if(isInRoom) {
                         const MessageID = sha256Hash(UserID + ContentJSON.content + Object.keys(rooms[members[UserID].In].messages).length.toString());
                         const MessageObject = {
@@ -171,6 +186,11 @@ try {
                 break;
     
                 case "election":
+                    if(!validateMessage(ContentJSON.content, "test")) {
+                        sendError(client, `Invalid message format for ${ContentJSON.type}.`);
+                        break;
+                    }
+
                     const isMemberBelongToRoom = rooms[members[UserID].In].members.includes(ContentJSON.content);
                     const isMemberAMod = rooms[members[UserID].In].mods.includes(ContentJSON.content);
                     const isMemberHasPermission = members[UserID].In == UserID;
@@ -217,6 +237,11 @@ try {
                 break;
     
                 case "pause":
+                    if(!validateMessage(ContentJSON.content, true)) {
+                        sendError(client, `Invalid message format for ${ContentJSON.type}.`);
+                        break;
+                    }
+
                     if(UserID === members[UserID].In) {
                         rooms[members[UserID].In].isPaused = ContentJSON.content;
                         broadcastToRoom(members[UserID].In, ContentJSON);
@@ -228,6 +253,11 @@ try {
                 break;
     
                 case "sync":
+                    if(!validateMessage(ContentJSON.content, 1)) {
+                        sendError(client, `Invalid message format for ${ContentJSON.type}.`);
+                        break;
+                    }
+
                     if(UserID === members[UserID].In) {
                         broadcastToRoom(members[UserID].In, ContentJSON);
                         Logs.addEntry(members[UserID].In, "sync", UserID, { to: ContentJSON.content });
@@ -249,7 +279,32 @@ catch(err) {
 }
 
 server.listen(PORT, () => {
-    console.log(`Hello World! Server's running at port: ${PORT}.`)
+    console.log(`Hello World! Server's running at port: ${PORT}.`);
+});
+
+server.on("close", () => {
+    Logs.createLog();
+});
+
+// Log creation and shutdown handling
+server.on("close", Logs.createLog);
+
+server.on('error', (err) => {
+    console.error('Server error:', err);
+    shutdown();
+});
+
+process.on('SIGINT', shutdown);
+process.on('SIGTERM', shutdown);
+
+process.on('uncaughtException', (err) => {
+    console.error('Uncaught Exception:', err);
+    shutdown();
+});
+
+process.on('unhandledRejection', (reason) => {
+    console.error('Unhandled Rejection:', reason);
+    shutdown();
 });
 
 //classes
@@ -281,7 +336,18 @@ const Logs = class {
      * Add a new entry to the logs.
      */
     static addEntry = (roomID, entryType, entryTarget, extras = {}) => {
-        const allowedEntryType = ["connection", "disconnection", "election", "host", "message", "join", "leave", "pause", "sync", "error"];
+        const allowedEntryType = [
+            "connection",
+            "disconnection",
+            "election",
+            "host",
+            "message",
+            "join",
+            "leave",
+            "pause",
+            "sync",
+            "error"
+        ];
 
         if(!allowedEntryType.includes(entryType)) {
             throw new TypeError(`Unknown entryType "${entryType}", please try again.`);
@@ -357,6 +423,15 @@ const Logs = class {
     };
 };
 
+const shutdown = () => {
+    console.log('Shutting down gracefully...');
+    server.close(() => {
+        createLog();
+        console.log('All connections closed, exiting.');
+        process.exit(0);
+    });
+}
+
 /**
  * Returns the current time as a formatted string.
  */
@@ -402,4 +477,50 @@ const sendError = (client, message) => {
         type: "error",
         content: message
     }));
+};
+
+const validateMessage = (message, sample) => {
+    const typeMessage = getType(message);
+    const typeSample = getType(sample);
+
+    if(typeMessage !== typeSample) 
+        return false;
+
+    if(typeMessage === "array") {
+        if(sample.length === 0) 
+            return Array.isArray(message);
+
+        for(const item of message) {
+            if(!validateMessage(item, sample[0])) 
+                return false;
+        }
+        return true;
+    }
+
+    if(typeMessage === "object") {
+        if(!sameKeys(message, sample)) 
+            return false;
+
+        for(const key of Object.keys(message)) {
+            if(!validateMessage(message[key], sample[key])) 
+                return false;
+        }
+        return true;
+    }
+
+    return typeMessage === typeSample;
+};
+
+const sameKeys = (a, b) => {
+    const ka = Object.keys(a).sort();
+    const kb = Object.keys(b).sort();
+    return ka.length === kb.length && ka.every((k, i) => k === kb[i]);
+};
+
+const getType = (object) => {
+    if(object === null)
+        return "null";
+    if(Array.isArray(object))
+        return "array";
+    return typeof object;
 };
