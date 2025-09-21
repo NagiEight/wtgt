@@ -36,7 +36,6 @@ const Topbar = () => {
         document.addEventListener('mousedown', handleClickOutside);
         return () => document.removeEventListener('mousedown', handleClickOutside);
     }, []);
-
     const notifications = [
         {
             avt: '/avatars/user1.png',
