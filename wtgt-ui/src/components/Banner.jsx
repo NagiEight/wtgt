@@ -24,8 +24,25 @@ const Banner = () => {
         setError('');
         const formattedIP = serverIP.startsWith('ws://') ? serverIP : `ws://${serverIP}`;
         console.log(`Connecting to server at ${formattedIP}`);
-        initSocket(formattedIP);
-        navigate('/videos');
+
+        const ws = initSocket(formattedIP);
+
+        if (!ws) {
+            setError("Failed to connect to server. Please check the IP address and try again.");
+            return;
+        }
+
+        ws.onopen = () => {
+            console.log('WebSocket connection established.');
+            navigate('/videos');
+        };
+
+        ws.onerror = (err) => {
+            console.error('WebSocket error:', err);
+            setError("Unable to connect to server. Please check the IP address and try again.");
+        };
+
+
     };
 
     return (
