@@ -1,11 +1,9 @@
 //Imports
-const
-    http = require("http"),
-    ws = require("ws"),
-    crypto = require("crypto"),
-    fs = require("fs/promises"),
-    path = require("path")
-;
+import { createServer } from "http";
+import { Server, OPEN } from "ws";
+import { createHash } from "crypto";
+import { mkdir, access, writeFile } from "fs/promises";
+import { join as _join } from "path";
 
 //Constants
 const
@@ -37,10 +35,10 @@ const
          *  }
         */
     },
-    server = http.createServer((req, res) => {
+    server = createServer((req, res) => {
 
     }),
-    wss = new ws.Server({ server })
+    wss = new Server({ server })
 ;
 
 try {
@@ -395,23 +393,23 @@ const Logs = class {
      * Create a log file at logs.
      */
     static createLog = async () => {
-        await fs.mkdir("logs", { recursive: true });
+        await mkdir("logs", { recursive: true });
     
         const logstring = Logs.toString();
     
         let
             logID = sha256Hash(getCurrentTime()),
             fileName = `${logID}.log`,
-            filePath = path.join("logs", fileName),
+            filePath = _join("logs", fileName),
             counter = 1
         ;
     
         while(true) {
             try {
-                await fs.access(filePath);
+                await access(filePath);
     
                 fileName = `${logID}_${counter}.log`;
-                filePath = path.join("logs", fileName);
+                filePath = _join("logs", fileName);
                 ++counter;
             }
             catch {
@@ -419,7 +417,7 @@ const Logs = class {
             }
         }
     
-        await fs.writeFile(filePath, logstring, "utf-8");
+        await writeFile(filePath, logstring, "utf-8");
     };
 };
 
@@ -455,7 +453,7 @@ const getCurrentTime = () => {
  * Returns a SHA-256 hash of the given content.
  */
 const sha256Hash = (content) => {
-    return crypto.createHash("sha256").update(content).digest("hex");
+    return createHash("sha256").update(content).digest("hex");
 };
 
 const broadcastToRoom = (RoomID, message) => {
@@ -465,7 +463,7 @@ const broadcastToRoom = (RoomID, message) => {
     rooms[RoomID].members.forEach(memberID => {
         const member = members[memberID];
         if(member && member.socket) {
-            if(member.socket.readyState === ws.OPEN) {
+            if(member.socket.readyState === OPEN) {
                 member.Socket.send(JSON.stringify(message));
             }
         }
