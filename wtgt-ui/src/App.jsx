@@ -7,7 +7,8 @@ import Watch from './pages/Watch';
 import Join from './pages/Join';
 import Host from './pages/Host';
 import { initSocket } from './utils/roomManager';
-import Videos from './pages/Videos';
+import Connect from './pages/Connect';
+import Library from './pages/Library'
 
 function App() {
   return (
@@ -18,7 +19,8 @@ function App() {
         <Route path="/watch" element={<Watch />} />
         <Route path="/host" element={<Host />} />
         <Route path="/join" element={<Join />} />
-        <Route path="/videos" element={<Videos />} />
+        <Route path="/connect" element={<Connect />} />
+        <Route path="/library" element={<Library />} />
       </Routes>
     </Router>
 

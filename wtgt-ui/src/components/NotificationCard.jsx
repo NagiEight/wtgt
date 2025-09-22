@@ -2,7 +2,7 @@ import React from 'react';
 
 const NotificationCard = ({ avt, content, timestamp }) => {
     return (
-        <div className="flex items-start space-x-4 px-4 py-3 hover:bg-[var(--color-cyan-100)] transition rounded-md">
+        <div className="flex items-start space-x-4 px-4 py-3 hover:bg-(--color-magenta) transition rounded-md">
             {/* Avatar */}
             <img
                 src={avt}
@@ -12,8 +12,8 @@ const NotificationCard = ({ avt, content, timestamp }) => {
 
             {/* Content + Timestamp */}
             <div className="flex-1">
-                <p className="text-sm text-[var(--color-black-500)]">{content}</p>
-                <span className="text-xs text-gray-500">{timestamp}</span>
+                <p className="text-sm text-(--color-text)">{content}</p>
+                <span className="text-xs text-(--color-subtext)">{timestamp}</span>
             </div>
         </div>
     );

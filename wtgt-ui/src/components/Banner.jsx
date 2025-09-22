@@ -24,16 +24,33 @@ const Banner = () => {
         setError('');
         const formattedIP = serverIP.startsWith('ws://') ? serverIP : `ws://${serverIP}`;
         console.log(`Connecting to server at ${formattedIP}`);
-        initSocket(formattedIP);
-        navigate('/videos');
+
+        const ws = initSocket(formattedIP);
+
+        if (!ws) {
+            setError("Failed to connect to server. Please check the IP address and try again.");
+            return;
+        }
+
+        ws.onopen = () => {
+            console.log('WebSocket connection established.');
+            navigate('/videos');
+        };
+
+        ws.onerror = (err) => {
+            console.error('WebSocket error:', err);
+            setError("Unable to connect to server. Please check the IP address and try again.");
+        };
+
+
     };
 
     return (
         <section
-            className="w-full bg-cover bg-center text-[var(--color-black-500)] py-20"
+            className="w-full bg-cover bg-center text-(--color-text) py-20"
             style={{ backgroundImage: `url(${bannerImage})` }}
         >
-            <div className="max-w-4xl mx-auto px-6 text-center bg-white/70 backdrop-blur-sm rounded-lg py-10">
+            <div className="max-w-4xl mx-auto px-6 text-center bg-(--color-bg)/70 backdrop-blur-sm rounded-lg py-10">
                 <h1 className="text-4xl font-bold font-[var(--font-display)] mb-4">
                     Welcome to WTGT
                 </h1>
@@ -54,12 +71,12 @@ const Banner = () => {
                                 }
                             }}
                             placeholder="Enter Server IP"
-                            className="flex-1 px-4 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-[var(--color-cyan-500)]"
+                            className="flex-1 px-4 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-(--color-cyan)"
                         />
 
                         <button
                             onClick={handleConnect}
-                            className="px-6 py-2 bg-[var(--color-magenta-500)] text-white rounded-md font-semibold hover:bg-[var(--color-cyan-500)] transition"
+                            className="px-6 py-2 bg-(--color-cyan) text-white rounded-md font-semibold hover:bg-(--color-magenta) transition"
                         >
                             Connect
                         </button>

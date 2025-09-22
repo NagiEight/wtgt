@@ -1,4 +1,3 @@
-// @ts-check
 // wsClient.js
 
 // import { useNavigate } from "react-router-dom";
@@ -7,14 +6,22 @@ let mediaName = '';
 // const navigate = useNavigate();
 export const initSocket = (serverIp) => {
     if (!ws || ws.readyState === WebSocket.CLOSED) {
-        // socket = new WebSocket(`ws://localhost:3000`); // Replace with your server address
-        ws = new WebSocket(serverIp); // Replace with your server address
+        ws = new WebSocket(serverIp);
     }
-    ws.onopen = () => {
-        console.log('WebSocket connection established.');
+    if (ws) {
+
+        ws.onopen = () => {
+            console.log('WebSocket connection established.');
+        };
+
+        return ws;
     }
-    return ws;
+    else {
+        console.error('Failed to initialize WebSocket:', error);
+        return null;
+    }
 };
+
 
 export const getSocket = () => {
     if (!ws || ws.readyState !== WebSocket.OPEN) {
@@ -34,6 +41,10 @@ const host = async (mediaName) => {
     ws.onerror = (err) => {
         console.error('WebSocket error:', err);
         alert('Failed to connect to server. Please check the IP and try again.');
+    }
+    ws.onmessage = (message) => {
+        mediaName = JSON.parse(message.data).content.CurrentMedia;
+        console.log('Received message:', mediaName);
     }
 }
 
