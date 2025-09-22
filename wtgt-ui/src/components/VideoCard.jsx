@@ -1,11 +1,13 @@
-import React from 'react';
-
-const VideoCard = ({ video }) => (
-    <div className="bg-white rounded-lg shadow hover:shadow-lg transition p-4">
-        <img src={video.thumbnail} alt={video.title} className="w-full h-48 object-cover rounded" />
-        <h3 className="mt-2 text-lg font-semibold">{video.title}</h3>
-        <p className="text-sm text-gray-500">{video.channel}</p>
-    </div>
-);
-
+const VideoCard = ({ thumbnail, title, channel, views, date }) => {
+    return (
+        <div className=" overflow-hidden shadow-md bg-(--color-bg) text-(--color-text)">
+            <img src={thumbnail} alt="Video Thumbnail" className="w-full h-48 object-cover" />
+            <div className="bg-(--color-bg) p-4">
+                <h3 className="text-lg font-bold mb-1">{title}</h3>
+                <p className="text-sm text-gray-300">{channel}</p>
+                <p className="text-xs text-gray-400 mt-1">{views} • {date}</p>
+            </div>
+        </div>
+    );
+};
 export default VideoCard;

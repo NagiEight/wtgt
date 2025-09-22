@@ -1,37 +1,27 @@
 @import "tailwindcss";
 
-@theme dark {
-  --color-black-500: rgb(255, 255, 255);
-}
-
-@theme light {
+@theme {
   --font-display: "Satoshi", "sans-serif";
   --breakpoint-3xl: 120rem;
-  --color-cyan-500: rgb(0, 183, 235);
-  --color-magenta-500: rgb(235, 0, 183);
-  --color-yellow-500: rgb(255, 235, 0);
-  --color-black-500: rgb(0, 0, 0);
 
-  /* Optional: CMYK composite tones */
-  --color-cmyk-deep-purple: rgb(102, 0, 153);
-  /* mix of cyan + magenta */
-  --color-cmyk-olive: rgb(128, 128, 0);
-  /* mix of yellow + black */
-
-  /* Easing */
+  --color-cyan: rgb(0, 183, 235);
+  --color-magenta: rgb(235, 0, 183);
   --ease-fluid: cubic-bezier(0.3, 0, 0, 1);
   --ease-snappy: cubic-bezier(0.2, 0, 0, 1);
 }
 
 @layer base {
   [data-theme='dark'] {
-    --color-black-500: #eaeaea;
-    --color-cyan-100: #1e1e1e;
+    --color-yellow: #ffc42e;
+    --color-text: #eaeaea;
+    --color-subtext: #a3a3a3;
+    --color-bg: #1e1e1e;
   }
 
   [data-theme='light'] {
-    --color-black-500: #1e1e1e;
-    --color-cyan-100: #eaeaea;
-    --color-yellow-500: #DAA520;
+    --color-yellow: #DAA520;
+    --color-text: #1e1e1e;
+    --color-subtext: #636363;
+    --color-bg: #eaeaea;
   }
 }
