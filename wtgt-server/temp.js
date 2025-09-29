@@ -79,7 +79,14 @@ wss.on("connection", (client, req) => {
 
 
     client.on("message", (message) => {
-        const ContentJSON = JSON.parse(message.toString());
+        let ContentJSON;
+        try {
+            ContentJSON = JSON.parse(message.toString());
+        }
+        catch {
+            sendError(client, "Invalid JSON message sent, try again.")
+            return;
+        }
         const isInRoom = members[UserID].In !== "";
 
         switch(ContentJSON.type) {
@@ -392,7 +399,7 @@ const Logs = class {
 const shutdown = () => {
     console.log('Shutting down gracefully...');
     server.close(() => {
-        createLog();
+        Logs.createLog();
         console.log('All connections closed, exiting.');
         process.exit(0);
     });
