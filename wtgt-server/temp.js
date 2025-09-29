@@ -87,11 +87,10 @@ wss.on("connection", (client, req) => {
             sendError(client, "Invalid JSON message sent, try again.")
             return;
         }
-        const isInRoom = members[UserID].In !== "";
 
         switch(ContentJSON.type) {
             /**
-             *  {
+             *  { //Note: Server will not return anything in this type of message.
              *      "type": "host",
              *      "content": {
              *          "MediaName": "helloworld.mp4",
@@ -103,31 +102,114 @@ wss.on("connection", (client, req) => {
                 host(ContentJSON, client, UserID);
                 break;
 
+            /** //client-to-server:
+             *  {
+             *      "type": "join",
+             *      "content": "RoomID"
+             *  }
+             * 
+             *  //server-to-client:
+             *  { //this one is for the joined member
+             *      "type": "init",
+             *      "content": {
+             *          "CurrentMedia": "helloworld.mp4",
+             *          "IsPaused": false,
+             *          "Mods": ["ModID1", "ModID2"],
+             *          "Members": {
+             *              "MemberID1": {
+             *                  "UserName": "Nagi Eight",
+             *                  "Avt": "avt"
+             *              }
+             *          },
+             *          "Messages": {
+             *              "MessageID1": {
+             *                  "Sender": "MemberID1",
+             *                  "Text": "hello world!",
+             *                  "Timestamp": "timestamp"
+             *              }
+             *          }
+             *      }
+             *  }
+             *  { //this one is for the other members of the room
+             *      "type": "join",
+             *      "content": {
+             *          "UserID": "UserID",
+             *          "UserName": "Claire Iidea",
+             *          "Avt": "avt"
+             *      }
+             *  }
+             */
             case "join":
                 join(ContentJSON, client, UserID);
                 break;
 
+            /** //client-to-server:
+             *  {
+             *      "type": "message",
+             *      "content": "Hello World!"
+             *  }
+             * 
+             *  //server-to-client:
+             *  {
+             *      "type": "message",
+             *      "content": {
+             *          "MessageID": "MessageID",
+             *          "MessageObject": {
+             *              "Sender": "SenderID",
+             *              "Text": "Hello World!",
+             *              "Timestamp": "timestamp"
+             *          }
+             *      }
+             *  }
+             */
             case "message":
                 sendMessage(ContentJSON, client, UserID);;
                 break;
 
+            /**
+             *  {
+             *      "type": "election",
+             *      "content": "UserID"
+             *  }
+             */
             case "election":
                 election(ContentJSON, client, UserID);
                 break;
             
-            /**
+            /** //client-to-server:
              *  {
              *      "type": "leave"
+             *  }
+             * 
+             *  //server-to-client:
+             *  {
+             *      "type": "leave",
+             *      "content": "UserID"
+             *  }
+             *  { //this one is when the host leave
+             *      "type": "end"
              *  }
              */
             case "leave":
                 leave(client, UserID);
                 break;
             
+            /**
+             *  {
+             *      "type": "pause",
+             *      "content": false
+             *  }
+             */
             case "pause":
                 pause(ContentJSON, client, UserID);
                 break;
 
+            /**
+             *  {
+             *      "type": "sync",
+             *      "content": 69420
+             *  }
+             */
             case "sync":
                 sync(ContentJSON, client, UserID);
                 break;
@@ -142,12 +224,12 @@ wss.on("connection", (client, req) => {
 //classes
 const Logs = class {
     /**
-     * Server's log. Use addEntry instead of mutating this directly.
+     * Server's log. Use addEntry instead of changing this directly.
      */
     static logs = [];
 
     /**
-     * A list of predefined suffix for most logging event types. Don't mutate this, please.
+     * A list of predefined suffix for most logging event types. Don't change this, please.
      */
     static formatList = {
         connection: " connected.",
@@ -290,11 +372,14 @@ const sha256Hash = (content) => {
     return crypto.createHash("sha256").update(content).digest("hex");
 };
 
-const broadcastToRoom = (RoomID, message) => {
+const broadcastToRoom = (RoomID, message, except = null) => {
     if(!rooms[RoomID])
         return;
-    
+
     rooms[RoomID].members.forEach(memberID => {
+        if(memberID === except) {
+            return;
+        }
         const member = members[memberID];
         if(member && member.socket) {
             if(member.socket.readyState === ws.OPEN) {
@@ -391,6 +476,7 @@ const host = (ContentJSON, client, UserID) => {
         sendError(client, `Invalid message format for ${ContentJSON.type}.`);
         return;
     }
+    const isInRoom = members[UserID].In !== "";
 
     if(!isInRoom) {
         members[UserID].In = UserID;
@@ -418,6 +504,7 @@ const join = (ContentJSON, client, UserID) => {
         sendError(client, `Unknown room ${ContentJSON.content}.`);
         return;
     }
+    const isInRoom = members[UserID].In !== "";
 
     if(!isInRoom) {
         rooms[ContentJSON.content].members.push(UserID);
@@ -448,7 +535,7 @@ const join = (ContentJSON, client, UserID) => {
                 UserName: userProfile["UserName"],
                 Avt: userProfile["Avt"]
             }
-        });
+        }, UserID);
         Logs.addEntry(members[UserID].In, "join", UserID);
     }
     else {
@@ -461,6 +548,7 @@ const sendMessage = (ContentJSON, client, UserID) => {
         sendError(client, `Invalid message format for ${ContentJSON.type}.`);
         return;
     }
+    const isInRoom = members[UserID].In !== "";
 
     if(isInRoom) {
         const MessageID = sha256Hash(UserID + ContentJSON.content + Object.keys(rooms[members[UserID].In].messages).length.toString());
@@ -515,6 +603,7 @@ const election = (ContentJSON, client, UserID) => {
 };
 
 const leave = (client, UserID) => {
+    const isInRoom = members[UserID].In !== "";
     if(isInRoom) {
         if(UserID === members[UserID].In) {
             broadcastToRoom(members[UserID].In, {type: "end"});
