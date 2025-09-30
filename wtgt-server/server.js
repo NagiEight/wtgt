@@ -303,6 +303,11 @@ wss.on("connection", (client, req) => {
                 adminLogin(UserID, client);
                 break;
             
+            /** //Note: Server will not return anything in this type of message.
+             *  {
+             *      "type": "logout"
+             *  }
+             */
             case "admindLogout":
                 if(!validateMessage(ContentJSON, { type: "test" })) {
                     sendError(client, `Invalid message format for ${ContentJSON.type}.`);
