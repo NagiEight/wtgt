@@ -478,20 +478,19 @@ const host = (ContentJSON, client, UserID) => {
     }
     const isInRoom = members[UserID].In !== "";
 
-    if(!isInRoom) {
-        members[UserID].In = UserID;
-        rooms[UserID] = {
-            currentMedia: ContentJSON.content.MediaName,
-            isPaused: ContentJSON.content.IsPaused,
-            mods: [],
-            members: [UserID],
-            messages: {}
-        }
-        Logs.addEntry(UserID, "host", UserID);
-    }
-    else {
+    if(isInRoom) {
         sendError(client, `Member ${UserID} is already belong to a room.`);
+        return;
     }
+    members[UserID].In = UserID;
+    rooms[UserID] = {
+        currentMedia: ContentJSON.content.MediaName,
+        isPaused: ContentJSON.content.IsPaused,
+        mods: [],
+        members: [UserID],
+        messages: {}
+    }
+    Logs.addEntry(UserID, "host", UserID);
 };
 
 const join = (ContentJSON, client, UserID) => {
@@ -506,41 +505,41 @@ const join = (ContentJSON, client, UserID) => {
     }
     const isInRoom = members[UserID].In !== "";
 
-    if(!isInRoom) {
-        rooms[ContentJSON.content].members.push(UserID);
-        members[UserID].In = ContentJSON.content;
-
-        const currentRoom = rooms[ContentJSON.content];
-        const membersObj = {};
-
-        for(const memberID of currentRoom.members) {
-            membersObj[memberID] = {
-                UserName: members[memberID].UserName,
-                Avt: members[memberID].Avt
-            };
-        }
-
-        client.send(JSON.stringify({type: "init", content: {
-            CurrentMedia: currentRoom.MediaName,
-            IsPaused: currentRoom.IsPaused,
-            Mods: currentRoom.mods,
-            Members: membersObj,
-            Messages: currentRoom.messages
-        }}));
-
-        broadcastToRoom(members[UserID].In, {
-            type: "join",
-            content: {
-                UserID,
-                UserName: userProfile["UserName"],
-                Avt: userProfile["Avt"]
-            }
-        }, UserID);
-        Logs.addEntry(members[UserID].In, "join", UserID);
-    }
-    else {
+    if(isInRoom) {
         sendError(client, `Member ${UserID} is already belong to a room.`);
+        return;
     }
+
+    rooms[ContentJSON.content].members.push(UserID);
+    members[UserID].In = ContentJSON.content;
+
+    const currentRoom = rooms[ContentJSON.content];
+    const membersObj = {};
+
+    for(const memberID of currentRoom.members) {
+        membersObj[memberID] = {
+            UserName: members[memberID].UserName,
+            Avt: members[memberID].Avt
+        };
+    }
+
+    client.send(JSON.stringify({type: "init", content: {
+        CurrentMedia: currentRoom.MediaName,
+        IsPaused: currentRoom.IsPaused,
+        Mods: currentRoom.mods,
+        Members: membersObj,
+        Messages: currentRoom.messages
+    }}));
+
+    broadcastToRoom(members[UserID].In, {
+        type: "join",
+        content: {
+            UserID,
+            UserName: userProfile["UserName"],
+            Avt: userProfile["Avt"]
+        }
+    }, UserID);
+    Logs.addEntry(members[UserID].In, "join", UserID);
 };
 
 const sendMessage = (ContentJSON, client, UserID) => {
@@ -550,29 +549,28 @@ const sendMessage = (ContentJSON, client, UserID) => {
     }
     const isInRoom = members[UserID].In !== "";
 
-    if(isInRoom) {
-        const MessageID = sha256Hash(UserID + ContentJSON.content + Object.keys(rooms[members[UserID].In].messages).length.toString());
-        const MessageObject = {
-            Sender: UserID,
-            Text: ContentJSON.content,
-            Timestamp: getCurrentTime()
-        };
-            
-        rooms[members[UserID].In].messages[MessageID] = MessageObject;
-
-        broadcastToRoom(members[UserID].In, {
-            type: "message",
-            content: {
-                MessageID,
-                MessageObject
-            }
-        });
-
-        Logs.addEntry(members[UserID].In, "message", UserID, { text: ContentJSON.content });
-    }
-    else {
+    if(!isInRoom) {
         sendError(client, `Member ${UserID} does not belong to a room.`);
+        return;
     }
+    const MessageID = sha256Hash(UserID + ContentJSON.content + Object.keys(rooms[members[UserID].In].messages).length.toString());
+    const MessageObject = {
+        Sender: UserID,
+        Text: ContentJSON.content,
+        Timestamp: getCurrentTime()
+    };
+        
+    rooms[members[UserID].In].messages[MessageID] = MessageObject;
+
+    broadcastToRoom(members[UserID].In, {
+        type: "message",
+        content: {
+            MessageID,
+            MessageObject
+        }
+    });
+
+    Logs.addEntry(members[UserID].In, "message", UserID, { text: ContentJSON.content });
 };
 
 const election = (ContentJSON, client, UserID) => {
@@ -604,27 +602,25 @@ const election = (ContentJSON, client, UserID) => {
 
 const leave = (client, UserID) => {
     const isInRoom = members[UserID].In !== "";
-    if(isInRoom) {
-        if(UserID === members[UserID].In) {
-            broadcastToRoom(members[UserID].In, {type: "end"});
-            const RoomID = members[UserID].In;
-
-            for(const MemberID of rooms[members[UserID].In].members) {
-                members[MemberID].In = "";
-            }
-
-            delete rooms[RoomID];
-        }
-        else {
-            rooms[members[UserID].In].members = rooms[members[UserID].In].members.filter(member => member !== UserID);
-            broadcastToRoom(members[UserID].In, {type: "leave", content: UserID});
-            members[UserID].In = "";
-            Logs.addEntry(members[UserID].In, "leave", UserID);
-        }
-    }
-    else {
+    if(!isInRoom) {
         sendError(client, `Member ${UserID} does not belong to a room.`);
+        return;
     }
+    if(UserID === members[UserID].In) {
+        broadcastToRoom(members[UserID].In, {type: "end"});
+        const RoomID = members[UserID].In;
+
+        for(const MemberID of rooms[members[UserID].In].members) {
+            members[MemberID].In = "";
+        }
+
+        delete rooms[RoomID];
+        return;
+    }
+    rooms[members[UserID].In].members = rooms[members[UserID].In].members.filter(member => member !== UserID);
+    broadcastToRoom(members[UserID].In, {type: "leave", content: UserID});
+    members[UserID].In = "";
+    Logs.addEntry(members[UserID].In, "leave", UserID);
 };
 
 const pause = (ContentJSON, client, UserID) => {
@@ -633,14 +629,13 @@ const pause = (ContentJSON, client, UserID) => {
         return;
     }
 
-    if(UserID === members[UserID].In) {
-        rooms[members[UserID].In].isPaused = ContentJSON.content;
-        broadcastToRoom(members[UserID].In, ContentJSON);
-        Logs.addEntry(members[UserID].In, "pause", UserID);
-    }
-    else {
+    if(!UserID === members[UserID].In) {
         sendError(client, "Insufficient permission.");
+        return;
     }
+    rooms[members[UserID].In].isPaused = ContentJSON.content;
+    broadcastToRoom(members[UserID].In, ContentJSON);
+    Logs.addEntry(members[UserID].In, "pause", UserID);
 };
 
 const sync = (ContentJSON, client, UserID) => {
@@ -649,11 +644,24 @@ const sync = (ContentJSON, client, UserID) => {
         return;
     }
 
-    if(UserID === members[UserID].In) {
-        broadcastToRoom(members[UserID].In, ContentJSON);
-        Logs.addEntry(members[UserID].In, "sync", UserID, { to: ContentJSON.content });
-    }
-    else {
+    if(!UserID === members[UserID].In) {
         sendError(client, "Insufficient permission.");
+        return;
     }
+    broadcastToRoom(members[UserID].In, ContentJSON);
+    Logs.addEntry(members[UserID].In, "sync", UserID, { to: ContentJSON.content });
+};
+
+const adminLogs = (ContentJSON, adminClient, isAuthorized) => {
+    if(!isAuthorized) {
+        sendError(adminClient, "Unauthorized access to admin features.");
+        return;
+    }
+};
+
+const adminAuth = (ContentJSON, credential) => {
+    if(ContentJSON.content === credential)
+        return true;
+
+    return false;
 };
