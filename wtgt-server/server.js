@@ -568,35 +568,6 @@ const getType = (object) => {
     return typeof object;
 };
 
-server.listen(PORT, () => {
-    console.log(`Hello World! Server's running at port: ${PORT}.`);
-});
-
-server.on("close", () => {
-    Logs.createLog();
-});
-
-// Log creation and shutdown handling
-server.on("close", Logs.createLog);
-
-server.on('error', (err) => {
-    console.error('Server error:', err);
-    shutdown();
-});
-
-process.on('SIGINT', shutdown);
-process.on('SIGTERM', shutdown);
-
-process.on('uncaughtException', (err) => {
-    console.error('Uncaught Exception:', err);
-    shutdown();
-});
-
-process.on('unhandledRejection', (reason) => {
-    console.error('Unhandled Rejection:', reason);
-    shutdown();
-});
-
 const host = (ContentJSON, client, UserID) => {
     if(!validateMessage(ContentJSON, { type: "test", content: { MediaName: "test", IsPaused: true }})) {
         sendError(client, `Invalid message format for ${ContentJSON.type}.`);
@@ -789,3 +760,32 @@ const adminLogin = (UserID, adminClient) => {
         }
     }));
 };
+
+server.listen(PORT, () => {
+    console.log(`Hello World! Server's running at port: ${PORT}.`);
+});
+
+server.on("close", () => {
+    Logs.createLog();
+});
+
+// Log creation and shutdown handling
+server.on("close", Logs.createLog);
+
+server.on('error', (err) => {
+    console.error('Server error:', err);
+    shutdown();
+});
+
+process.on('SIGINT', shutdown);
+process.on('SIGTERM', shutdown);
+
+process.on('uncaughtException', (err) => {
+    console.error('Uncaught Exception:', err);
+    shutdown();
+});
+
+process.on('unhandledRejection', (reason) => {
+    console.error('Unhandled Rejection:', reason);
+    shutdown();
+});
