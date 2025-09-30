@@ -308,6 +308,11 @@ wss.on("connection", (client, req) => {
                     sendError(client, `Invalid message format for ${ContentJSON.type}.`);
                     break;
                 }
+                if(!UserID === adminID) {
+                    sendError(client, "Trying to logout while not being an admin.");
+                    break;
+                }
+                adminID = "";
                 break;
 
             default:
