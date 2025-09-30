@@ -290,7 +290,7 @@ wss.on("connection", (client, req) => {
                     sendError(client, `Invalid message format for ${ContentJSON.type}.`);
                     break;
                 }
-                if(adminLoginAttempts > 5) {
+                if(adminLoginAttempts > maximumAdminLoginAttempts) {
                     sendError(client, "Exceeded the login attempt count, cannot continue.");
                     break;
                 }
@@ -305,10 +305,10 @@ wss.on("connection", (client, req) => {
             
             /** //Note: Server will not return anything in this type of message.
              *  {
-             *      "type": "logout"
+             *      "type": "adminLogout"
              *  }
              */
-            case "admindLogout":
+            case "adminLogout":
                 if(!validateMessage(ContentJSON, { type: "test" })) {
                     sendError(client, `Invalid message format for ${ContentJSON.type}.`);
                     break;
@@ -344,8 +344,7 @@ const Logs = class {
         host: " hosted a new room.",
         join: " joined.",
         leave: " left.",
-        pause: " paused.",
-        error: ""
+        pause: " paused."
     };
     
     static generateLogString = (logEntry, suffix = "") => {
@@ -391,9 +390,11 @@ const Logs = class {
             case "sync":
                 LogString = Logs.generateLogString(logEntry, `: Skipped to ${logEntry.to}.`);
                 break;
-
+            case "error":
+                LogString = Logs.generateLogString(logEntry, `: Error: ${logEntry.message}`);
+                break;
             default:
-                LogString = Logs.generateLogString(logEntry, Logs.formatList[logEntry.event], "\n");
+                LogString = Logs.generateLogString(logEntry, Logs.formatList[logEntry.event]);
                 break;
         }
         console.log(LogString);
@@ -416,6 +417,10 @@ const Logs = class {
                     
                 case "sync":
                     output += Logs.generateLogString(logEntry, `: Skipped to ${logEntry.to}.\n`);
+                    break;
+
+                case "error":
+                    output += Logs.generateLogString(logEntry, `: Error: ${logEntry.message}\n`);
                     break;
 
                 default:
@@ -511,11 +516,13 @@ const broadcastToRoom = (RoomID, message, except = null) => {
     });
 };
 
-const sendError = (client, message) => {
+const sendError = (client, message, UserID) => {
     client.send(JSON.stringify({
         type: "error",
         content: message
     }));
+
+    Logs.addEntry("", "error", UserID, { message })
 };
 
 const validateMessage = (message, sample) => {
