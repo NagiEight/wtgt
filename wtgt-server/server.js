@@ -390,9 +390,11 @@ const Logs = class {
             case "sync":
                 LogString = Logs.generateLogString(logEntry, `: Skipped to ${logEntry.to}.`);
                 break;
+                
             case "error":
                 LogString = Logs.generateLogString(logEntry, `: Error: ${logEntry.message}`);
                 break;
+
             default:
                 LogString = Logs.generateLogString(logEntry, Logs.formatList[logEntry.event]);
                 break;
