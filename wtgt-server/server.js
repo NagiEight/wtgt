@@ -4,6 +4,7 @@ const
     ws = require("ws"),
     crypto = require("crypto"),
     fs = require("fs/promises"),
+    utils = require("./utils"),
     path = require("path")
 ;
 
@@ -40,19 +41,39 @@ const
     server = http.createServer((req, res) => {
 
     }),
-    wss = new ws.Server({ server })
+    wss = new ws.Server({ server }),
+    passwordPath = "./credentials/password.txt"
 ;
+
+let 
+    credentials = "",
+    adminID = ""
+;
+
+try {
+    credentials = await fs.readFile(passwordPath, "utf-8");
+}
+catch {
+    credentials = "";
+}
+
+if(credentials.length < 16) {
+    credentials = utils.generatePassword();
+    await fs.writeFile(passwordPath, credentials, "utf-8");
+}
 
 wss.on("connection", (client, req) => {
     const
         url = new URL(req.url, `ws://${req.headers.host}`),
         userProfile = {
-            UserName: url.searchParams.get("UserName"), 
+            UserName: url.searchParams.get("UserName"),
             Avt: url.searchParams.get("Avt")
         },
         IP = req.socket.remoteAddress,
         UserID = crypto.randomUUID()
     ;
+
+    let isAuthorized = false;
 
     if(Object.keys(members).includes(UserID)) {
         return;
@@ -73,6 +94,10 @@ wss.on("connection", (client, req) => {
     }
 
     client.on("close", () => {
+        if(isAuthorized) {
+            adminID = "";
+            isAuthorized = false;
+        }
         Logs.addEntry("", "disconnection", UserID);
         delete members[UserID];
     });
@@ -214,6 +239,64 @@ wss.on("connection", (client, req) => {
                 sync(ContentJSON, client, UserID);
                 break;
 
+            /**
+             * Admin messages.
+             */
+
+            /** //Admin-to-server
+             *  {
+             *      "type": "adminLogin",
+             *      "content": "serverPassword"
+             *  }
+             * 
+             *  //Server-to-admin
+             *  {
+             *      "type": "adminInit", 
+             *      "content": {
+             *          "Logs": "ServerLogs",
+             *          "Rooms": {
+             *              "roomID": {
+             *                  "currentMedia": "medianame.mp4",
+             *                  "mods": [],
+             *                  "members": [...memberIDs],
+             *                  "isPaused": false,
+             *                  "messages": {
+             *                      "messageID": {
+             *                          "Sender": "memberID",
+             *                          "Text": "hello world!",
+             *                          "Timestamp": "timestamp"
+             *                      }
+             *                  }
+             *              }
+             *          },
+             *          "Members": {
+             *              "MemberID": {
+             *                  "UserName": "Claire Iidea",
+             *                  "In": "roomID",
+             *                  "Avt": "uri"
+             *              }
+             *          }
+             *      }
+             *  }
+             *  {
+             *      "type": "log",
+             *      "content": "logstring"
+             *  }
+             */
+            case "adminLogin":
+                if(!validateMessage(ContentJSON.content, "test")) {
+                    sendError(client, `Invalid message format for ${ContentJSON.type}.`);
+                    break;
+                }
+                
+                isAuthorized = ContentJSON.content === credentials;
+                if(!isAuthorized) {
+                    sendError(adminClient, "Incorrect admin password, please try again.");
+                    break;
+                }
+                adminLogin(UserID, client);
+                break;
+
             default:
                 sendError(client, `Unknown request type: ${ContentJSON.type}`);
                 break;
@@ -242,8 +325,8 @@ const Logs = class {
         error: ""
     };
     
-    static generateLogString = (logEntry, suffix) => {
-        return `{${logEntry.roomID}}[${logEntry.timestamp}] ${logEntry.entryTarget}${suffix}\n`;
+    static generateLogString = (logEntry, suffix = "") => {
+        return `{${logEntry.roomID}}[${logEntry.timestamp}] ${logEntry.entryTarget}${suffix}`;
     };
     
     /**
@@ -276,14 +359,26 @@ const Logs = class {
         };
         Logs.logs.push(logEntry);
 
-        if(logEntry.event === "message") {
-            console.log(Logs.generateLogString(logEntry, `: ${logEntry.text}`));
+        let LogString;
+        switch(logEntry.event) {
+            case "message":
+                LogString = Logs.generateLogString(logEntry, `: ${logEntry.text}`);
+                break;
+                
+            case "sync":
+                LogString = Logs.generateLogString(logEntry, `: Skipped to ${logEntry.to}.`);
+                break;
+
+            default:
+                LogString = Logs.generateLogString(logEntry, Logs.formatList[logEntry.event], "\n");
+                break;
         }
-        else if(logEntry.event === "sync") {
-            console.log(Logs.generateLogString(logEntry, `: Skipped to ${logEntry.to}.`));
-        }
-        else {
-            console.log(Logs.generateLogString(logEntry, Logs.formatList[logEntry.event]));
+        console.log(LogString);
+        if(Object.keys(members).includes(adminID)) {
+            members[adminID].Socket.send(JSON.stringify({
+                type: "log",
+                content: LogString
+            }));
         }
     }
 
@@ -291,14 +386,18 @@ const Logs = class {
         let output = "";
 
         Logs.logs.forEach(log => {
-            if(log.event === "message") {
-                output += Logs.generateLogString(log, `: ${log.text}`);
-            }
-            else if(logEntry.event === "sync") {
-                output += Logs.generateLogString(logEntry, `: Skipped to ${logEntry.to}.`)
-            }
-            else {
-                output += Logs.generateLogString(log, Logs.formatList[log.event]);
+            switch(log.event) {
+                case "message":
+                    output += Logs.generateLogString(log, `: ${log.text}\n`);
+                    break;
+                    
+                case "sync":
+                    output += Logs.generateLogString(logEntry, `: Skipped to ${logEntry.to}.\n`);
+                    break;
+
+                default:
+                    output += Logs.generateLogString(log, Logs.formatList[log.event], "\n");
+                    break;
             }
         });
 
@@ -589,7 +688,7 @@ const election = (ContentJSON, client, UserID) => {
         broadcastToRoom(members[UserID].In, ContentJSON);
         Logs.addEntry(members[UserID].In, "election", ContentJSON.content);
     }
-    else if(isMemberHasPermission) {
+    else if(!isMemberHasPermission) {
         sendError(client, `Insufficient permission.`);
     }
     else if(isMemberAMod) {
@@ -652,16 +751,14 @@ const sync = (ContentJSON, client, UserID) => {
     Logs.addEntry(members[UserID].In, "sync", UserID, { to: ContentJSON.content });
 };
 
-const adminLogs = (ContentJSON, adminClient, isAuthorized) => {
-    if(!isAuthorized) {
-        sendError(adminClient, "Unauthorized access to admin features.");
-        return;
-    }
-};
-
-const adminAuth = (ContentJSON, credential) => {
-    if(ContentJSON.content === credential)
-        return true;
-
-    return false;
+const adminLogin = (UserID, adminClient) => {
+    adminID = UserID;
+    adminClient.send(JSON.stringify({
+        type: "adminInit", 
+        content: {
+            Logs: Logs.toString(),
+            Rooms: rooms,
+            Members: members
+        }
+    }));
 };
