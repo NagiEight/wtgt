@@ -286,8 +286,12 @@ wss.on("connection", (client, req) => {
              *  }
              */
             case "adminLogin":
-                if(!validateMessage(ContentJSON.content, "test")) {
+                if(!validateMessage(ContentJSON, { type: "test", content: "test"})) {
                     sendError(client, `Invalid message format for ${ContentJSON.type}.`);
+                    break;
+                }
+                if(adminLoginAttempts > 5) {
+                    sendError(client, "Exceeded the login attempt count, cannot continue.");
                     break;
                 }
                 if(!ContentJSON.content === credentials) {
@@ -300,7 +304,7 @@ wss.on("connection", (client, req) => {
                 break;
             
             case "admindLogout":
-                if(!validateMessage(ContentJSON.content, "test")) {
+                if(!validateMessage(ContentJSON, { type: "test" })) {
                     sendError(client, `Invalid message format for ${ContentJSON.type}.`);
                     break;
                 }
