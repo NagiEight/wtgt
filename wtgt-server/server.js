@@ -42,7 +42,8 @@ const
 
     }),
     wss = new ws.Server({ server }),
-    passwordPath = "./credentials/password.txt"
+    passwordPath = "./credentials/password.txt",
+    maximumAdminLoginAttempts = 5
 ;
 
 let 
@@ -69,11 +70,9 @@ wss.on("connection", (client, req) => {
             UserName: url.searchParams.get("UserName"),
             Avt: url.searchParams.get("Avt")
         },
-        IP = req.socket.remoteAddress,
         UserID = crypto.randomUUID()
     ;
-
-    let isAuthorized = false;
+    let adminLoginAttempts = 0;
 
     if(Object.keys(members).includes(UserID)) {
         return;
@@ -94,9 +93,8 @@ wss.on("connection", (client, req) => {
     }
 
     client.on("close", () => {
-        if(isAuthorized) {
+        if(UserID === adminID) {
             adminID = "";
-            isAuthorized = false;
         }
         Logs.addEntry("", "disconnection", UserID);
         delete members[UserID];
@@ -216,6 +214,10 @@ wss.on("connection", (client, req) => {
              *  }
              */
             case "leave":
+                if(!validateMessage(ContentJSON, { type: "test" })) {
+                    sendError(client, `Invalid message format for ${ContentJSON.type}.`);
+                    break;
+                }
                 leave(client, UserID);
                 break;
             
@@ -288,13 +290,20 @@ wss.on("connection", (client, req) => {
                     sendError(client, `Invalid message format for ${ContentJSON.type}.`);
                     break;
                 }
-                
-                isAuthorized = ContentJSON.content === credentials;
-                if(!isAuthorized) {
-                    sendError(adminClient, "Incorrect admin password, please try again.");
+                if(!ContentJSON.content === credentials) {
+                    adminLoginAttempts += 1;
+                    sendError(client, "Incorrect admin password, please try again.");
                     break;
                 }
+                adminLoginAttempts = 0;
                 adminLogin(UserID, client);
+                break;
+            
+            case "admindLogout":
+                if(!validateMessage(ContentJSON.content, "test")) {
+                    sendError(client, `Invalid message format for ${ContentJSON.type}.`);
+                    break;
+                }
                 break;
 
             default:
@@ -503,9 +512,6 @@ const validateMessage = (message, sample) => {
         return false;
 
     if(typeMessage === "array") {
-        if(sample.length === 0) 
-            return Array.isArray(message);
-
         for(const item of message) {
             if(!validateMessage(item, sample[0])) 
                 return false;
@@ -571,7 +577,7 @@ process.on('unhandledRejection', (reason) => {
 });
 
 const host = (ContentJSON, client, UserID) => {
-    if(!validateMessage(ContentJSON.content, { MediaName: "test", IsPaused: true })) {
+    if(!validateMessage(ContentJSON, { type: "test", content: { MediaName: "test", IsPaused: true }})) {
         sendError(client, `Invalid message format for ${ContentJSON.type}.`);
         return;
     }
@@ -593,7 +599,7 @@ const host = (ContentJSON, client, UserID) => {
 };
 
 const join = (ContentJSON, client, UserID) => {
-    if(!validateMessage(ContentJSON.content, "test")) {
+    if(!validateMessage(ContentJSON, { type: "test", content: "test" })) {
         sendError(client, `Invalid message format for ${ContentJSON.type}.`);
         return;
     }
@@ -642,7 +648,7 @@ const join = (ContentJSON, client, UserID) => {
 };
 
 const sendMessage = (ContentJSON, client, UserID) => {
-    if(!validateMessage(ContentJSON.content, "test")) {
+    if(!validateMessage(ContentJSON, { type: "test", content: "test" })) {
         sendError(client, `Invalid message format for ${ContentJSON.type}.`);
         return;
     }
@@ -673,7 +679,7 @@ const sendMessage = (ContentJSON, client, UserID) => {
 };
 
 const election = (ContentJSON, client, UserID) => {
-    if(!validateMessage(ContentJSON.content, "test")) {
+    if(!validateMessage(ContentJSON, { type: "test", content: "test" })) {
         sendError(client, `Invalid message format for ${ContentJSON.type}.`);
         return;
     }
@@ -723,7 +729,7 @@ const leave = (client, UserID) => {
 };
 
 const pause = (ContentJSON, client, UserID) => {
-    if(!validateMessage(ContentJSON.content, true)) {
+    if(!validateMessage(ContentJSON, { type: "test", content: true })) {
         sendError(client, `Invalid message format for ${ContentJSON.type}.`);
         return;
     }
@@ -738,7 +744,7 @@ const pause = (ContentJSON, client, UserID) => {
 };
 
 const sync = (ContentJSON, client, UserID) => {
-    if(!validateMessage(ContentJSON.content, 1)) {
+    if(!validateMessage(ContentJSON, { type: "test", content: 1 })) {
         sendError(client, `Invalid message format for ${ContentJSON.type}.`);
         return;
     }
