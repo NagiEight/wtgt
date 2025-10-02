@@ -1,5 +1,5 @@
 import VideoCard from '../components/VideoCard';
-
+import TagLine from '../components/TagLine';
 const videos = [
     {
         thumbnail: 'https://via.placeholder.com/320x180.png?text=Video+1',
@@ -21,6 +21,11 @@ const videos = [
 const Library = () => {
     return (
         <div className="p-6 bg-(--color-bg) min-h-screen">
+            <TagLine
+                tags={['Action', 'Romance', 'Isekai', 'Slice of Life', 'Mecha']}
+                onTagClick={(tag) => console.log(`Clicked: ${tag}`)}
+            />
+
             <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6">
                 {videos.map((video, index) => (
                     <VideoCard key={index} {...video} />

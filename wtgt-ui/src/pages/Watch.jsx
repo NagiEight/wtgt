@@ -1,9 +1,16 @@
 import React from 'react';
 import ChatPanel from '../components/ChatPanel';
+import VideoPanel from '../components/VideoPanel';
 
 const Watch = () => {
     return (
-        <div className="flex h-full bg-[var(--color-cyan-50)] text-[var(--color-black-500)]">
+        <div className="flex h-full md:flex-row bg-(--color-bg) text-(--color-text)">
+            <VideoPanel
+                title="DECO*27 - Monitoring (Best Friend Remix) feat. Hatsune Miku"
+                src="/media/episode1.mp4"
+                poster="/media/episode1-thumb.jpg"
+
+            />
             <ChatPanel />
         </div>
 

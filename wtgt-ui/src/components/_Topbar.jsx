@@ -55,12 +55,12 @@ const Topbar = () => {
     ];
 
     return (
-        <header className="w-full bg-(--color-bg) text-(--color-text) shadow-md h-16 relative z-50">
+        <header className="w-full bg-(--color-bg) text-(--color-text) shadow-md h-16 relative z-50 relative">
             <div className="max-w-7xl mx-auto px-6 h-full flex items-center justify-between">
 
                 {/* Left: Hamburger + Logo */}
-                <div className="flex items-center space-x-4 relative">
-                    <button onClick={() => toggleMenu('hamburger')} className="p-2 hover:bg-(--color-cyan) transition duration:300 rounded-md">
+                <div className="flex items-center space-x-4 relative ">
+                    <button onClick={() => toggleMenu('hamburger')} className="p-2 hover:bg-(--color-cyan) transition duration:300 rounded-md ">
                         <Bars3Icon className="h-6 w-6" />
                     </button>
                     <Link to="/" className="text-2xl font-bold font-[var(--font-display)] flex space-x-1 items-center">

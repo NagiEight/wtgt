@@ -43,7 +43,7 @@ const ChatPanel = ({ roomNumber = 'Room #1234', username = 'You', roomId = 'defa
     };
 
     return (
-        <div className="w-80 border-l border-gray-200 bg-white p-4 flex flex-col h-[calc(100vh-4rem)]">
+        <div className="w-80 border-l border-(--color-text) bg-(-=color-bg) border-dashed border-l-2 p-4 flex flex-col h-[calc(100vh-4rem)]">
             <div className="flex items-center justify-between mb-2">
                 <h3 className="text-lg font-semibold">Live Chat</h3>
                 <span className="text-sm text-gray-500">{roomNumber}</span>
@@ -52,7 +52,7 @@ const ChatPanel = ({ roomNumber = 'Room #1234', username = 'You', roomId = 'defa
             {/* Scrollable Message List */}
             <div className="flex-1 overflow-y-auto space-y-2 mb-4">
                 {messages.map((msg, idx) => (
-                    <div key={idx} className="bg-[var(--color-cyan-100)] p-2 rounded-md text-sm">
+                    <div key={idx} className="bg-(--color-cyan) p-2 rounded-sm text-sm">
                         <strong>{msg.user}:</strong> {msg.text}
                     </div>
                 ))}
@@ -65,13 +65,13 @@ const ChatPanel = ({ roomNumber = 'Room #1234', username = 'You', roomId = 'defa
                     value={input}
                     onChange={(e) => setInput(e.target.value)}
                     placeholder="Type a message..."
-                    className="flex-1 px-4 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-[var(--color-cyan-500)]"
+                    className="flex-1 w-full bg-(--color-yellow)/20 h-10 px-4 py-2 border rounded-sm border-2 focus:outline-none focus:ring-2 focus:ring-(--color-cyan)"
                 />
                 <button
                     onClick={handleSend}
-                    className="p-2 bg-[var(--color-cyan-500)] text-white rounded-md hover:bg-[var(--color-cyan-600)]"
+                    className="h-10 w-10 p-2 bg-(--color-cyan)/20 border-2 border-(--color-text) text-white rounded-md hover:bg-(--color-cyan)"
                 >
-                    <PaperAirplaneIcon className="h-5 w-5" />
+                    <PaperAirplaneIcon className="h-5 w-5 text-(--color-text)" />
                 </button>
             </div>
         </div>

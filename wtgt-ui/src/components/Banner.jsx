@@ -34,7 +34,7 @@ const Banner = () => {
 
         ws.onopen = () => {
             console.log('WebSocket connection established.');
-            navigate('/videos');
+            navigate('/connect');
         };
 
         ws.onerror = (err) => {
