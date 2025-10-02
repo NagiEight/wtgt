@@ -51,18 +51,19 @@ let
     credentials = "",
     adminID = ""
 ;
+(async () => {
+    try {
+        credentials = await fs.readFile(passwordPath, "utf-8");
+    }
+    catch {
+        credentials = "";
+    }
 
-try {
-    credentials = await fs.readFile(passwordPath, "utf-8");
-}
-catch {
-    credentials = "";
-}
-
-if(credentials.length < 16) {
-    credentials = utils.generatePassword();
-    await fs.writeFile(passwordPath, credentials, "utf-8");
-}
+    if(credentials.length < 16) {
+        credentials = utils.generatePassword();
+        await fs.writeFile(passwordPath, credentials, "utf-8");
+    }
+})();
 
 wss.on("connection", (client, req) => {
     const
