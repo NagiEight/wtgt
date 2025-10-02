@@ -276,7 +276,7 @@ wss.on("connection", (client, req) => {
              *  }
              */
             case "leave":
-                if(!validateMessage(ContentJSON, { type: "test" })) {
+                if(!utils.validateMessage(ContentJSON, { type: "test" })) {
                     sendError(client, `Invalid message format for ${ContentJSON.type}.`, UserID);
                     break;
                 }
@@ -366,7 +366,7 @@ wss.on("connection", (client, req) => {
              *  }
              */
             case "adminLogin":
-                if(!validateMessage(ContentJSON, { type: "test", content: "test"})) {
+                if(!utils.validateMessage(ContentJSON, { type: "test", content: "test"})) {
                     sendError(client, `Invalid message format for ${ContentJSON.type}.`, UserID);
                     break;
                 }
@@ -389,7 +389,7 @@ wss.on("connection", (client, req) => {
              *  }
              */
             case "adminLogout":
-                if(!validateMessage(ContentJSON, { type: "test" })) {
+                if(!utils.validateMessage(ContentJSON, { type: "test" })) {
                     sendError(client, `Invalid message format for ${ContentJSON.type}.`, UserID);
                     break;
                 }
@@ -607,51 +607,8 @@ const sendError = (client, message, UserID) => {
     Logs.addEntry("", "error", UserID, { message })
 };
 
-const validateMessage = (message, sample) => {
-    const typeMessage = getType(message);
-    const typeSample = getType(sample);
-
-    if(typeMessage !== typeSample) 
-        return false;
-
-    if(typeMessage === "array") {
-        for(const item of message) {
-            if(!validateMessage(item, sample[0])) 
-                return false;
-        }
-        return true;
-    }
-
-    if(typeMessage === "object") {
-        if(!sameKeys(message, sample)) 
-            return false;
-
-        for(const key of Object.keys(message)) {
-            if(!validateMessage(message[key], sample[key])) 
-                return false;
-        }
-        return true;
-    }
-
-    return typeMessage === typeSample;
-};
-
-const sameKeys = (a, b) => {
-    const ka = Object.keys(a).sort();
-    const kb = Object.keys(b).sort();
-    return ka.length === kb.length && ka.every((k, i) => k === kb[i]);
-};
-
-const getType = (object) => {
-    if(object === null)
-        return "null";
-    if(Array.isArray(object))
-        return "array";
-    return typeof object;
-};
-
 const host = (ContentJSON, client, UserID) => {
-    if(!validateMessage(ContentJSON, { type: "test", content: { MediaName: "test", IsPaused: true }})) {
+    if(!utils.validateMessage(ContentJSON, { type: "test", content: { MediaName: "test", IsPaused: true }})) {
         sendError(client, `Invalid message format for ${ContentJSON.type}.`, UserID);
         return;
     }
@@ -684,7 +641,7 @@ const host = (ContentJSON, client, UserID) => {
 };
 
 const join = (ContentJSON, client, UserID) => {
-    if(!validateMessage(ContentJSON, { type: "test", content: "test" })) {
+    if(!utils.validateMessage(ContentJSON, { type: "test", content: "test" })) {
         sendError(client, `Invalid message format for ${ContentJSON.type}.`, UserID);
         return;
     }
@@ -739,7 +696,7 @@ const join = (ContentJSON, client, UserID) => {
 };
 
 const sendMessage = (ContentJSON, client, UserID) => {
-    if(!validateMessage(ContentJSON, { type: "test", content: "test" })) {
+    if(!utils.validateMessage(ContentJSON, { type: "test", content: "test" })) {
         sendError(client, `Invalid message format for ${ContentJSON.type}.`, UserID);
         return;
     }
@@ -780,7 +737,7 @@ const sendMessage = (ContentJSON, client, UserID) => {
 };
 
 const election = (ContentJSON, client, UserID) => {
-    if(!validateMessage(ContentJSON, { type: "test", content: "test" })) {
+    if(!utils.validateMessage(ContentJSON, { type: "test", content: "test" })) {
         sendError(client, `Invalid message format for ${ContentJSON.type}.`, UserID);
         return;
     }
@@ -859,7 +816,7 @@ const leave = (client, UserID) => {
 };
 
 const pause = (ContentJSON, client, UserID) => {
-    if(!validateMessage(ContentJSON, { type: "test", content: true })) {
+    if(!utils.validateMessage(ContentJSON, { type: "test", content: true })) {
         sendError(client, `Invalid message format for ${ContentJSON.type}.`, UserID);
         return;
     }
@@ -884,7 +841,7 @@ const pause = (ContentJSON, client, UserID) => {
 };
 
 const sync = (ContentJSON, client, UserID) => {
-    if(!validateMessage(ContentJSON, { type: "test", content: 1 })) {
+    if(!utils.validateMessage(ContentJSON, { type: "test", content: 1 })) {
         sendError(client, `Invalid message format for ${ContentJSON.type}.`, UserID);
         return;
     }
