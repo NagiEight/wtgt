@@ -20,9 +20,9 @@ const
          *      isPaused: false,
          *      messages: {
          *          messageID: {
-         *              Sender: memberID,
+         *              Sender: "memberID",
          *              Text: "hello world!",
-         *              Timestamp: somethingsomething
+         *              Timestamp: "somethingsomething"
          *          }
          *      }
          *  }
@@ -926,10 +926,6 @@ const sendAdminMessage = (JSONContent) => {
     members[adminID].Socket.send(JSON.stringify(JSONContent));
 };
 
-server.listen(PORT, () => {
-    console.log(`Hello World! Server's running at port: ${PORT}.`);
-});
-
 server.on("close", () => {
     Logs.createLog();
 });
@@ -953,4 +949,8 @@ process.on('uncaughtException', (err) => {
 process.on('unhandledRejection', (reason) => {
     console.error('Unhandled Rejection:', reason);
     shutdown();
+});
+
+server.listen(PORT, () => {
+    console.log(`Hello World! Server's running at port: ${PORT}.`);
 });
