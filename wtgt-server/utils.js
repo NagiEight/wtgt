@@ -1,10 +1,46 @@
 const crypto = require("crypto");
 
-const clamp = (number, min, max = null) => {
-    if(max === null) 
-        [max, min] = [min, 0];
+const sameKeys = (a, b) => {
+    const ka = Object.keys(a).sort();
+    const kb = Object.keys(b).sort();
+    return ka.length === kb.length && ka.every((k, i) => k === kb[i]);
+};
 
-    return Math.min(Math.max(number, min), max);
+const getType = (object) => {
+    if(object === null)
+        return "null";
+    if(Array.isArray(object))
+        return "array";
+    return typeof object;
+};
+
+const validateMessage = (message, sample) => {
+    const typeMessage = getType(message);
+    const typeSample = getType(sample);
+
+    if(typeMessage !== typeSample) 
+        return false;
+
+    if(typeMessage === "array") {
+        for(const item of message) {
+            if(!validateMessage(item, sample[0])) 
+                return false;
+        }
+        return true;
+    }
+
+    if(typeMessage === "object") {
+        if(!sameKeys(message, sample)) 
+            return false;
+
+        for(const key of Object.keys(message)) {
+            if(!validateMessage(message[key], sample[key])) 
+                return false;
+        }
+        return true;
+    }
+
+    return typeMessage === typeSample;
 };
 
 const generatePassword = (length = 16) => {
@@ -33,4 +69,4 @@ const generatePassword = (length = 16) => {
     return output;
 };
 
-module.exports = { generatePassword };
+module.exports = { generatePassword, validateMessage };

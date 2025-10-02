@@ -20,9 +20,9 @@ const
          *      isPaused: false,
          *      messages: {
          *          messageID: {
-         *              Sender: memberID,
+         *              Sender: "memberID",
          *              Text: "hello world!",
-         *              Timestamp: somethingsomething
+         *              Timestamp: "somethingsomething"
          *          }
          *      }
          *  }
@@ -32,9 +32,9 @@ const
         /**
          *  MemberID: {
          *      UserName: "Claire Iidea",
-         *      In: roomID,
+         *      In: "roomID",
          *      Socket: wsObj,
-         *      Avt: <byteString>
+         *      Avt: "uri"
          *  }
         */
     },
@@ -46,6 +46,7 @@ const
     maximumAdminLoginAttempts = 5
 ;
 
+//runtime variables
 let 
     credentials = "",
     adminID = ""
@@ -73,6 +74,15 @@ wss.on("connection", (client, req) => {
         UserID = crypto.randomUUID()
     ;
     let adminLoginAttempts = 0;
+
+    sendAdminMessage({
+        type: "connection",
+        content: {
+            MemberID: UserID,
+            UserName: userProfile.UserName,
+            Avt: userProfile.Avt
+        }
+    });
 
     if(Object.keys(members).includes(UserID)) {
         return;
@@ -107,7 +117,7 @@ wss.on("connection", (client, req) => {
             ContentJSON = JSON.parse(message.toString());
         }
         catch {
-            sendError(client, "Invalid JSON message sent, try again.")
+            sendError(client, "Invalid JSON message sent, try again.", UserID)
             return;
         }
 
@@ -118,6 +128,16 @@ wss.on("connection", (client, req) => {
              *      "content": {
              *          "MediaName": "helloworld.mp4",
              *          "IsPaused": true
+             *      }
+             *  }
+             *  
+             *  //server-to-admin:
+             *  {
+             *      "type": "userHost",
+             *      "content": {
+             *          "MediaName": "helloworld.mp4",
+             *          "IsPaused": false,
+             *          "Host": "userID"
              *      }
              *  }
              */
@@ -161,6 +181,12 @@ wss.on("connection", (client, req) => {
              *          "Avt": "avt"
              *      }
              *  }
+             * 
+             *  //server-to-admin:
+             *  {
+             *      "type": "userJoin",
+             "      "content": "roomID"
+             *  }
              */
             case "join":
                 join(ContentJSON, client, UserID);
@@ -184,15 +210,38 @@ wss.on("connection", (client, req) => {
              *          }
              *      }
              *  }
+             * 
+             *  //server-to-admin
+             *  {
+             *      "type": "userMessage",
+             *      "content": {
+             *          "RoomID": "roomID",
+             *          "MessageID": "messageID",
+             *          "MessageObject": {
+             *              "Sender": "userID",
+             *              "Text": "hello world!",
+             *              "Timestamp": "somethingsomething"
+             *          }
+             *      }
+             *  }
              */
             case "message":
-                sendMessage(ContentJSON, client, UserID);;
+                sendMessage(ContentJSON, client, UserID);
                 break;
 
             /**
              *  {
              *      "type": "election",
              *      "content": "UserID"
+             *  }
+             * 
+             *  //server-to-admin
+             *  {
+             *      type: "userElection",
+             *      content: {
+             *          "RoomID": "roomID",
+             *          "Target": "userID"
+             *      }
              *  }
              */
             case "election":
@@ -212,10 +261,23 @@ wss.on("connection", (client, req) => {
              *  { //this one is when the host leave
              *      "type": "end"
              *  }
+             * 
+             *  //server-to-admin:
+             *  {
+             *      "type": "roomEnd",
+             *      "content": "roomID"
+             *  }
+             *  {
+             *      type: "memberLeave",
+             *      content: {
+             *          "RoomID": "roomID",
+             *          "UserID": "userID"
+             *      }
+             *  }
              */
             case "leave":
-                if(!validateMessage(ContentJSON, { type: "test" })) {
-                    sendError(client, `Invalid message format for ${ContentJSON.type}.`);
+                if(!utils.validateMessage(ContentJSON, { type: "test" })) {
+                    sendError(client, `Invalid message format for ${ContentJSON.type}.`, UserID);
                     break;
                 }
                 leave(client, UserID);
@@ -226,6 +288,15 @@ wss.on("connection", (client, req) => {
              *      "type": "pause",
              *      "content": false
              *  }
+             * 
+             *  //server-to-admin
+             *  {
+             *      "type": "userPause",
+             *      "content": {
+             *          "RoomID": "roomID",
+             *          "IsPaused": false
+             *      }
+             *  }
              */
             case "pause":
                 pause(ContentJSON, client, UserID);
@@ -235,6 +306,15 @@ wss.on("connection", (client, req) => {
              *  {
              *      "type": "sync",
              *      "content": 69420
+             *  }
+             * 
+             *  //server-to-admin:
+             *  {
+             *      "type": "userSync",
+             *      "content": {
+             *          "RoomID": "roomID",
+             *          "Timestamp": 69420
+             *      }
              *  }
              */
             case "sync":
@@ -286,17 +366,17 @@ wss.on("connection", (client, req) => {
              *  }
              */
             case "adminLogin":
-                if(!validateMessage(ContentJSON, { type: "test", content: "test"})) {
-                    sendError(client, `Invalid message format for ${ContentJSON.type}.`);
+                if(!utils.validateMessage(ContentJSON, { type: "test", content: "test"})) {
+                    sendError(client, `Invalid message format for ${ContentJSON.type}.`, UserID);
                     break;
                 }
                 if(adminLoginAttempts > maximumAdminLoginAttempts) {
-                    sendError(client, "Exceeded the login attempt count, cannot continue.");
+                    sendError(client, "Exceeded the login attempt count, cannot continue.", UserID);
                     break;
                 }
                 if(!ContentJSON.content === credentials) {
                     adminLoginAttempts += 1;
-                    sendError(client, "Incorrect admin password, please try again.");
+                    sendError(client, "Incorrect admin password, please try again.", UserID);
                     break;
                 }
                 adminLoginAttempts = 0;
@@ -309,19 +389,19 @@ wss.on("connection", (client, req) => {
              *  }
              */
             case "adminLogout":
-                if(!validateMessage(ContentJSON, { type: "test" })) {
-                    sendError(client, `Invalid message format for ${ContentJSON.type}.`);
+                if(!utils.validateMessage(ContentJSON, { type: "test" })) {
+                    sendError(client, `Invalid message format for ${ContentJSON.type}.`, UserID);
                     break;
                 }
                 if(!UserID === adminID) {
-                    sendError(client, "Trying to logout while not being an admin.");
+                    sendError(client, "Trying to logout while not being an admin.", UserID);
                     break;
                 }
                 adminID = "";
                 break;
 
             default:
-                sendError(client, `Unknown request type: ${ContentJSON.type}`);
+                sendError(client, `Unknown request type: ${ContentJSON.type}`, UserID);
                 break;
         }
     });
@@ -344,7 +424,8 @@ const Logs = class {
         host: " hosted a new room.",
         join: " joined.",
         leave: " left.",
-        pause: " paused."
+        pause: " paused.",
+        end: " ended their room session."
     };
     
     static generateLogString = (logEntry, suffix = "") => {
@@ -365,6 +446,7 @@ const Logs = class {
             "leave",
             "pause",
             "sync",
+            "end",
             "error"
         ];
 
@@ -400,12 +482,10 @@ const Logs = class {
                 break;
         }
         console.log(LogString);
-        if(Object.keys(members).includes(adminID)) {
-            members[adminID].Socket.send(JSON.stringify({
-                type: "log",
-                content: LogString
-            }));
-        }
+        sendAdminMessage({
+            type: "log",
+            content: LogString
+        });
     }
 
     static toString = () => {
@@ -510,8 +590,8 @@ const broadcastToRoom = (RoomID, message, except = null) => {
             return;
         }
         const member = members[memberID];
-        if(member && member.socket) {
-            if(member.socket.readyState === ws.OPEN) {
+        if(member && member.Socket) {
+            if(member.Socket.readyState === ws.OPEN) {
                 member.Socket.send(JSON.stringify(message));
             }
         }
@@ -527,60 +607,18 @@ const sendError = (client, message, UserID) => {
     Logs.addEntry("", "error", UserID, { message })
 };
 
-const validateMessage = (message, sample) => {
-    const typeMessage = getType(message);
-    const typeSample = getType(sample);
-
-    if(typeMessage !== typeSample) 
-        return false;
-
-    if(typeMessage === "array") {
-        for(const item of message) {
-            if(!validateMessage(item, sample[0])) 
-                return false;
-        }
-        return true;
-    }
-
-    if(typeMessage === "object") {
-        if(!sameKeys(message, sample)) 
-            return false;
-
-        for(const key of Object.keys(message)) {
-            if(!validateMessage(message[key], sample[key])) 
-                return false;
-        }
-        return true;
-    }
-
-    return typeMessage === typeSample;
-};
-
-const sameKeys = (a, b) => {
-    const ka = Object.keys(a).sort();
-    const kb = Object.keys(b).sort();
-    return ka.length === kb.length && ka.every((k, i) => k === kb[i]);
-};
-
-const getType = (object) => {
-    if(object === null)
-        return "null";
-    if(Array.isArray(object))
-        return "array";
-    return typeof object;
-};
-
 const host = (ContentJSON, client, UserID) => {
-    if(!validateMessage(ContentJSON, { type: "test", content: { MediaName: "test", IsPaused: true }})) {
-        sendError(client, `Invalid message format for ${ContentJSON.type}.`);
+    if(!utils.validateMessage(ContentJSON, { type: "test", content: { MediaName: "test", IsPaused: true }})) {
+        sendError(client, `Invalid message format for ${ContentJSON.type}.`, UserID);
         return;
     }
     const isInRoom = members[UserID].In !== "";
 
     if(isInRoom) {
-        sendError(client, `Member ${UserID} is already belong to a room.`);
+        sendError(client, `Member ${UserID} is already belong to a room.`, UserID);
         return;
     }
+
     members[UserID].In = UserID;
     rooms[UserID] = {
         currentMedia: ContentJSON.content.MediaName,
@@ -589,23 +627,33 @@ const host = (ContentJSON, client, UserID) => {
         members: [UserID],
         messages: {}
     }
+
+    sendAdminMessage({
+        type: "userHost",
+        content: {
+            MediaName: ContentJSON.content.MediaName,
+            IsPaused: ContentJSON.content.IsPaused,
+            Host: UserID
+        }
+    });
+
     Logs.addEntry(UserID, "host", UserID);
 };
 
 const join = (ContentJSON, client, UserID) => {
-    if(!validateMessage(ContentJSON, { type: "test", content: "test" })) {
-        sendError(client, `Invalid message format for ${ContentJSON.type}.`);
+    if(!utils.validateMessage(ContentJSON, { type: "test", content: "test" })) {
+        sendError(client, `Invalid message format for ${ContentJSON.type}.`, UserID);
         return;
     }
 
     if(!Object.keys(rooms).includes(ContentJSON.content)) {
-        sendError(client, `Unknown room ${ContentJSON.content}.`);
+        sendError(client, `Unknown room ${ContentJSON.content}.`, UserID);
         return;
     }
     const isInRoom = members[UserID].In !== "";
 
     if(isInRoom) {
-        sendError(client, `Member ${UserID} is already belong to a room.`);
+        sendError(client, `Member ${UserID} is already belong to a room.`, UserID);
         return;
     }
 
@@ -638,28 +686,35 @@ const join = (ContentJSON, client, UserID) => {
             Avt: userProfile["Avt"]
         }
     }, UserID);
+
+    sendAdminMessage({
+        type: "userJoin",
+        content: ContentJSON.content
+    });
+
     Logs.addEntry(members[UserID].In, "join", UserID);
 };
 
 const sendMessage = (ContentJSON, client, UserID) => {
-    if(!validateMessage(ContentJSON, { type: "test", content: "test" })) {
-        sendError(client, `Invalid message format for ${ContentJSON.type}.`);
+    if(!utils.validateMessage(ContentJSON, { type: "test", content: "test" })) {
+        sendError(client, `Invalid message format for ${ContentJSON.type}.`, UserID);
         return;
     }
     const isInRoom = members[UserID].In !== "";
 
     if(!isInRoom) {
-        sendError(client, `Member ${UserID} does not belong to a room.`);
+        sendError(client, `Member ${UserID} does not belong to a room.`, UserID);
         return;
     }
-    const MessageID = sha256Hash(UserID + ContentJSON.content + Object.keys(rooms[members[UserID].In].messages).length.toString());
+    const RoomID = members[UserID].In;
+    const MessageID = sha256Hash(UserID + ContentJSON.content + Object.keys(rooms[RoomID].messages).length.toString());
     const MessageObject = {
         Sender: UserID,
         Text: ContentJSON.content,
         Timestamp: getCurrentTime()
     };
         
-    rooms[members[UserID].In].messages[MessageID] = MessageObject;
+    rooms[RoomID].messages[MessageID] = MessageObject;
 
     broadcastToRoom(members[UserID].In, {
         type: "message",
@@ -669,86 +724,144 @@ const sendMessage = (ContentJSON, client, UserID) => {
         }
     });
 
-    Logs.addEntry(members[UserID].In, "message", UserID, { text: ContentJSON.content });
+    sendAdminMessage({
+        type: "userMessage",
+        content: {
+            RoomID,
+            MessageID,
+            MessageObject
+        }
+    });
+
+    Logs.addEntry(RoomID, "message", UserID, { text: ContentJSON.content });
 };
 
 const election = (ContentJSON, client, UserID) => {
-    if(!validateMessage(ContentJSON, { type: "test", content: "test" })) {
-        sendError(client, `Invalid message format for ${ContentJSON.type}.`);
+    if(!utils.validateMessage(ContentJSON, { type: "test", content: "test" })) {
+        sendError(client, `Invalid message format for ${ContentJSON.type}.`, UserID);
         return;
     }
 
-    const isMemberBelongToRoom = rooms[members[UserID].In].members.includes(ContentJSON.content);
-    const isMemberAMod = rooms[members[UserID].In].mods.includes(ContentJSON.content);
-    const isMemberHasPermission = members[UserID].In == UserID;
+    const 
+        isMemberBelongToRoom = rooms[members[UserID].In].members.includes(ContentJSON.content),
+        isMemberAMod = rooms[members[UserID].In].mods.includes(ContentJSON.content),
+        isMemberHasPermission = members[UserID].In == UserID,
+        isEligibleForElection = isMemberBelongToRoom && !isMemberAMod && isMemberHasPermission,
+        RoomID = members[UserID].In
+    ;
+    if(isEligibleForElection) {
+        rooms[RoomID].mods.push(ContentJSON.content);
 
-    if(isMemberBelongToRoom && !isMemberAMod && isMemberHasPermission) {
-        rooms[members[UserID].In].mods.push(ContentJSON.content);
+        broadcastToRoom(RoomID, ContentJSON);
 
-        broadcastToRoom(members[UserID].In, ContentJSON);
-        Logs.addEntry(members[UserID].In, "election", ContentJSON.content);
+        sendAdminMessage({
+            type: "userElection",
+            content: {
+                RoomID,
+                Target: ContentJSON.content
+            }
+        });
+
+        Logs.addEntry(RoomID, "election", ContentJSON.content);
     }
     else if(!isMemberHasPermission) {
-        sendError(client, `Insufficient permission.`);
+        sendError(client, `Insufficient permission.`, UserID);
     }
     else if(isMemberAMod) {
-        sendError(client, `Member ${ContentJSON.content} is already a moderator.`);
+        sendError(client, `Member ${ContentJSON.content} is already a moderator.`, UserID);
     }
     else {
-        sendError(client, `Unknown member ${ContentJSON.content}: Member does not exist or does not belong to this room.`);
+        sendError(client, `Unknown member ${ContentJSON.content}: Member does not exist or does not belong to this room.`, UserID);
     }
 };
 
 const leave = (client, UserID) => {
     const isInRoom = members[UserID].In !== "";
     if(!isInRoom) {
-        sendError(client, `Member ${UserID} does not belong to a room.`);
+        sendError(client, `Member ${UserID} does not belong to a room.`, UserID);
         return;
     }
-    if(UserID === members[UserID].In) {
+    const RoomID = members[UserID].In;
+    if(UserID === RoomID) {
         broadcastToRoom(members[UserID].In, {type: "end"});
-        const RoomID = members[UserID].In;
-
+        
         for(const MemberID of rooms[members[UserID].In].members) {
             members[MemberID].In = "";
         }
 
         delete rooms[RoomID];
-        return;
+
+        sendAdminMessage({
+            type: "roomEnd",
+            content: RoomID
+        });
+
+        Logs.addEntry(RoomID, "end", UserID);
     }
-    rooms[members[UserID].In].members = rooms[members[UserID].In].members.filter(member => member !== UserID);
-    broadcastToRoom(members[UserID].In, {type: "leave", content: UserID});
-    members[UserID].In = "";
-    Logs.addEntry(members[UserID].In, "leave", UserID);
+    else {
+        rooms[RoomID].members = rooms[RoomID].members.filter(member => member !== UserID);
+        broadcastToRoom(members[UserID].In, {type: "leave", content: UserID});
+        members[UserID].In = "";
+
+        sendAdminMessage({
+            type: "memberLeave",
+            content: {
+                RoomID,
+                UserID
+            }
+        });
+
+        Logs.addEntry(RoomID, "leave", UserID);
+    }
 };
 
 const pause = (ContentJSON, client, UserID) => {
-    if(!validateMessage(ContentJSON, { type: "test", content: true })) {
-        sendError(client, `Invalid message format for ${ContentJSON.type}.`);
+    if(!utils.validateMessage(ContentJSON, { type: "test", content: true })) {
+        sendError(client, `Invalid message format for ${ContentJSON.type}.`, UserID);
         return;
     }
 
     if(!UserID === members[UserID].In) {
-        sendError(client, "Insufficient permission.");
+        sendError(client, "Insufficient permission.", UserID);
         return;
     }
-    rooms[members[UserID].In].isPaused = ContentJSON.content;
-    broadcastToRoom(members[UserID].In, ContentJSON);
-    Logs.addEntry(members[UserID].In, "pause", UserID);
+    const RoomID = members[UserID].In;
+    rooms[RoomID].isPaused = ContentJSON.content;
+    broadcastToRoom(RoomID, ContentJSON);
+
+    sendAdminMessage({
+        type: "userPause",
+        content: {
+            RoomID,
+            IsPaused: ContentJSON.content
+        }
+    });
+
+    Logs.addEntry(RoomID, "pause", UserID);
 };
 
 const sync = (ContentJSON, client, UserID) => {
-    if(!validateMessage(ContentJSON, { type: "test", content: 1 })) {
-        sendError(client, `Invalid message format for ${ContentJSON.type}.`);
+    if(!utils.validateMessage(ContentJSON, { type: "test", content: 1 })) {
+        sendError(client, `Invalid message format for ${ContentJSON.type}.`, UserID);
+        return;
+    }
+    const RoomID = members[UserID].In;
+    if(!UserID === RoomID) {
+        sendError(client, "Insufficient permission.", UserID);
         return;
     }
 
-    if(!UserID === members[UserID].In) {
-        sendError(client, "Insufficient permission.");
-        return;
-    }
-    broadcastToRoom(members[UserID].In, ContentJSON);
-    Logs.addEntry(members[UserID].In, "sync", UserID, { to: ContentJSON.content });
+    broadcastToRoom(RoomID, ContentJSON);
+
+    sendAdminMessage({
+        type: "userSync",
+        content: {
+            RoomID,
+            Timestamp: ContentJSON.content
+        }
+    });
+
+    Logs.addEntry(RoomID, "sync", UserID, { to: ContentJSON.content });
 };
 
 const adminLogin = (UserID, adminClient) => {
@@ -763,9 +876,12 @@ const adminLogin = (UserID, adminClient) => {
     }));
 };
 
-server.listen(PORT, () => {
-    console.log(`Hello World! Server's running at port: ${PORT}.`);
-});
+const sendAdminMessage = (JSONContent) => {
+    if(adminID === "")
+        return;
+    
+    members[adminID].Socket.send(JSON.stringify(JSONContent));
+};
 
 server.on("close", () => {
     Logs.createLog();
@@ -790,4 +906,8 @@ process.on('uncaughtException', (err) => {
 process.on('unhandledRejection', (reason) => {
     console.error('Unhandled Rejection:', reason);
     shutdown();
+});
+
+server.listen(PORT, () => {
+    console.log(`Hello World! Server's running at port: ${PORT}.`);
 });
