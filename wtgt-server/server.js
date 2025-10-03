@@ -52,14 +52,6 @@ let
     adminID = ""
 ;
 (async () => {
-    try {
-        credentials = await fs.readFile(passwordPath, "utf-8");
-    }
-    catch {
-        credentials = "";
-    }
-
-    
     credentials = utils.generatePassword();
     await fs.writeFile(passwordPath, credentials, "utf-8");
 })();
