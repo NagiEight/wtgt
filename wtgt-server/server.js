@@ -59,10 +59,9 @@ let
         credentials = "";
     }
 
-    if(credentials.length < 16) {
-        credentials = utils.generatePassword();
-        await fs.writeFile(passwordPath, credentials, "utf-8");
-    }
+    
+    credentials = utils.generatePassword();
+    await fs.writeFile(passwordPath, credentials, "utf-8");
 })();
 
 wss.on("connection", (client, req) => {
