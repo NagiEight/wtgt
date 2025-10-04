@@ -1,19 +1,48 @@
 const crypto = require("crypto");
 
+/**
+ * @param {Object} a 
+ * @param {Object} b 
+ * @returns Whether 2 objects has the same keys in them. (Order insensitive)
+ */
 const sameKeys = (a, b) => {
     const ka = Object.keys(a).sort();
     const kb = Object.keys(b).sort();
     return ka.length === kb.length && ka.every((k, i) => k === kb[i]);
 };
 
+/**
+ * Get the true type of the passed in object.
+ * @param {any} object 
+ * @returns The true type of the object. null, array, int, float, infinities, and NaN included.
+ */
 const getType = (object) => {
+    const type = typeof object;
     if(object === null)
         return "null";
+    if(object === Infinity)
+        return "Infinity";
+    if(object === -Infinity)
+        return "-Infinity"; 
+    if(Number.isNaN(object))
+        return "NaN";
     if(Array.isArray(object))
         return "array";
-    return typeof object;
+    if(type === "number") {
+        if(Number.isInteger(object))
+            return "int";
+        else
+            return "float";
+    }
+    return type;
 };
 
+/**
+ * Perform a deep analysis on message, using sample as a control.
+ * @param {any} message 
+ * @param {any} sample 
+ * @returns Whether the message matches with the sample.
+ */
 const validateMessage = (message, sample) => {
     const typeMessage = getType(message);
     const typeSample = getType(sample);
@@ -43,6 +72,11 @@ const validateMessage = (message, sample) => {
     return typeMessage === typeSample;
 };
 
+/**
+ * Generate a password with the minimum length of 16.
+ * @param {number} length 
+ * @returns The password. Charset include alphanumeric characters and specials characters.
+ */
 const generatePassword = (length = 16) => {
     length = Math.max(16, length);
     

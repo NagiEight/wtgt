@@ -51,6 +51,7 @@ let
     credentials = "",
     adminID = ""
 ;
+
 (async () => {
     credentials = utils.generatePassword();
     await fs.writeFile(passwordPath, credentials, "utf-8");
@@ -65,6 +66,10 @@ wss.on("connection", (client, req) => {
         },
         UserID = crypto.randomUUID()
     ;
+
+    while(Object.keys(members).includes(UserID))
+        UserID = crypto.randomUUID();
+
     let adminLoginAttempts = 0;
 
     sendAdminMessage({
@@ -75,10 +80,6 @@ wss.on("connection", (client, req) => {
             Avt: userProfile.Avt
         }
     });
-
-    if(Object.keys(members).includes(UserID)) {
-        return;
-    }
     
     client.send(JSON.stringify({
         type: "info",
@@ -92,7 +93,7 @@ wss.on("connection", (client, req) => {
         In: "",
         Socket: client,
         Avt: userProfile.Avt
-    }
+    };
 
     client.on("close", () => {
         if(UserID === adminID) {
@@ -259,6 +260,13 @@ const Logs = class {
     
     /**
      * Add a new entry to the logs.
+     */
+    /**
+     * 
+     * @param {*} roomID 
+     * @param {"connection" | "disconnection" | "election" | "host" | "message" | "join" | "leave" | "pause" | "sync" | "end" | "error"} entryType 
+     * @param {*} entryTarget 
+     * @param {*} extras 
      */
     static addEntry = (roomID, entryType, entryTarget, extras = {}) => {
         const allowedEntryType = [
