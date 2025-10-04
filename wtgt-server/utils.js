@@ -17,26 +17,29 @@ const sameKeys = (a, b) => {
  * @returns The true type of the object. null, array, int, float, infinities, and NaN included.
  */
 const getType = (object) => {
-    const type = typeof object;
     switch(object) {
-         case null:
+        case null:
             return "null";
         case Infinity:
             return "Infinity";
         case -Infinity:
             return "-Infinity";
     }
-    if(Number.isNaN(object))
-        return "NaN";
-    if(Array.isArray(object))
-        return "array";
-    if(type === "number") {
-        if(Number.isInteger(object))
-            return "int";
-        else
-            return "float";
+    
+    const type = typeof object;
+    switch(true) {
+        case Number.isNaN(object):
+            return "NaN";
+        case Array.isArray(object):
+            return "array";
+        case type === "number":
+            if(Number.isInteger(object))
+                return "int";
+            else
+                return "float";
+        default:
+            return type;
     }
-    return type;
 };
 
 /**
