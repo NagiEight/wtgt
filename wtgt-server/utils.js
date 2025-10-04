@@ -18,12 +18,14 @@ const sameKeys = (a, b) => {
  */
 const getType = (object) => {
     const type = typeof object;
-    if(object === null)
-        return "null";
-    if(object === Infinity)
-        return "Infinity";
-    if(object === -Infinity)
-        return "-Infinity"; 
+    switch(object) {
+         case null:
+            return "null";
+        case Infinity:
+            return "Infinity";
+        case -Infinity:
+            return "-Infinity";
+    }
     if(Number.isNaN(object))
         return "NaN";
     if(Array.isArray(object))
