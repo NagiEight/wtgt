@@ -329,11 +329,11 @@ const Logs = class {
                     break;
                     
                 case "sync":
-                    output += Logs.generateLogString(logEntry, `: Skipped to ${logEntry.to}.\n`);
+                    output += Logs.generateLogString(log, `: Skipped to ${log.to}.\n`);
                     break;
 
                 case "error":
-                    output += Logs.generateLogString(logEntry, `: Error: ${logEntry.message}\n`);
+                    output += Logs.generateLogString(log, `: Error: ${log.message}\n`);
                     break;
 
                 default:
