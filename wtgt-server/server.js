@@ -260,13 +260,11 @@ const Logs = class {
     
     /**
      * Add a new entry to the logs.
-     */
-    /**
      * 
-     * @param {*} roomID 
+     * @param {string} roomID 
      * @param {"connection" | "disconnection" | "election" | "host" | "message" | "join" | "leave" | "pause" | "sync" | "end" | "error"} entryType 
-     * @param {*} entryTarget 
-     * @param {*} extras 
+     * @param {string} entryTarget 
+     * @param {Object} extras 
      */
     static addEntry = (roomID, entryType, entryTarget, extras = {}) => {
         const allowedEntryType = [
@@ -324,7 +322,7 @@ const Logs = class {
     static toString = () => {
         let output = "";
 
-        Logs.logs.forEach(log => {
+        for(const log of Logs.logs) {
             switch(log.event) {
                 case "message":
                     output += Logs.generateLogString(log, `: ${log.text}\n`);
@@ -342,7 +340,7 @@ const Logs = class {
                     output += Logs.generateLogString(log, Logs.formatList[log.event], "\n");
                     break;
             }
-        });
+        }
 
         return output.trim();
     }
@@ -417,18 +415,19 @@ const sha256Hash = (content) => {
 const broadcastToRoom = (RoomID, message, except = null) => {
     if(!rooms[RoomID])
         return;
-
-    rooms[RoomID].members.forEach(memberID => {
+    
+    for(const memberID of rooms[RoomID].members) {
         if(memberID === except) {
-            return;
+            continue;
         }
+
         const member = members[memberID];
         if(member && member.Socket) {
             if(member.Socket.readyState === ws.OPEN) {
                 member.Socket.send(JSON.stringify(message));
             }
         }
-    });
+    }
 };
 
 const sendError = (client, message, UserID) => {
