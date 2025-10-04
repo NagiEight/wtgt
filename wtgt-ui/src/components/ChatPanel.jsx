@@ -40,6 +40,7 @@ const ChatPanel = ({ roomNumber = 'Room #1234', username = 'You', roomId = 'defa
             chatManagerRef.current.sendMessage(input);
             setInput('');
         }
+
     };
 
     return (

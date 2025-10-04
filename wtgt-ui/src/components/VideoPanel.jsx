@@ -1,18 +1,53 @@
 import React from 'react';
+import { useState } from 'react';
+import { host } from "../utils/roomManager"
 
 const VideoPanel = ({ title, src, poster }) => {
+    const [videoFile, setVideoFile] = useState(null);
+
+    const handleUploading = (event) => {
+        const file = event.target.files[0];
+        if (file) {
+            setVideoFile(URL.createObjectURL(file));
+            console.log('Uploaded file:', file.name);
+        }
+        host(file.name, true);
+
+    };
+
+    const handleDownloading = () => {
+        if (src || videoFile) {
+            const link = document.createElement('a');
+            link.href = src || videoFile;
+            link.download = 'video.mp4';
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+        } else {
+            alert('No video available to download.');
+        }
+    }
     return (
         <div className="w-full mx-auto bg-(--color-bg) rounded-lg p-4 max-w-7xl">
             <div className="aspect-video w-full overflow-hidden rounded-sm">
-                <video
-                    className="w-full h-full "
-                    controls
-                    poster={poster}
-                >
-                    <source src={src} type="video/mp4" />
-                    Your browser does not support the video tag.
-                </video>
+                {(src || videoFile) ? (
+                    <video className="w-full h-full" controls poster={poster}>
+                        <source src={videoFile || src} type="video/mp4" />
+                        Your browser does not support the video tag.
+                    </video>
+                ) : (
+                    <div className="flex items-center justify-center w-full h-full bg-gray-100 border-2 border-dashed rounded-md">
+                        <label className="flex flex-col items-center justify-center w-full h-full cursor-pointer">
+                            <svg xmlns="http://www.w3.org/2000/svg" className="h-12 w-12 text-gray-400 mb-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a2 2 0 002 2h12a2 2 0 002-2v-1M12 12v6m0 0l-3-3m3 3l3-3m-6-6h6" />
+                            </svg>
+                            <span className="text-gray-600 font-medium">Upload a video</span>
+                            <input type="file" accept="video/*" className="hidden" onChange={handleUploading} />
+                        </label>
+                    </div>
+                )}
             </div>
+
             <div className='flex flex-col sm:flex-row justify-between gap-4 pt-2 items-center'>
                 {title && <h2 className="text-lg font-semibold mb-3">{title}</h2>}
                 <div className='flex gap-4'>

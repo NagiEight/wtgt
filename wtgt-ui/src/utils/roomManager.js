@@ -33,18 +33,19 @@ export const getSocket = () => {
 };
 
 /**
- * @param {string} mediaName
+ * @param {string} MediaName
+ * @param {bool} IsPaused 
  */
-const host = async (mediaName) => {
-    console.log('sending: ', JSON.stringify({ type: "host", content: mediaName }));
-    ws.send(JSON.stringify({ type: "host", content: mediaName }));
+const host = async (MediaName, IsPaused) => {
+    console.log('sending: ', JSON.stringify({ type: "host", content: { MediaName: MediaName, IsPaused: IsPaused } }));
+    ws.send(JSON.stringify({ type: "host", content: { MediaName: MediaName, IsPaused: IsPaused } }));
     ws.onerror = (err) => {
         console.error('WebSocket error:', err);
         alert('Failed to connect to server. Please check the IP and try again.');
     }
     ws.onmessage = (message) => {
-        mediaName = JSON.parse(message.data).content.CurrentMedia;
-        console.log('Received message:', mediaName);
+        MediaName = JSON.parse(message.data).content.CurrentMedia;
+        console.log('Received message:', MediaName);
     }
 }
 

@@ -18,7 +18,7 @@ const Connect = () => {
                     Join Room
                 </button>
                 <button
-                    onClick={() => navigate('/host')}
+                    onClick={() => navigate('/watch')}
                     className="px-6 py-3 rounded-md font-semibold bg-(--color-bg) border-3 border-(--color-subtext) text-(--color-text) transition-all duration-200 hover:bg-(--color-magenta) hover:text-(--color-bg) hover:border-(--color-bg) focus:outline-none focus:border-(--color-magenta)"
                 >
                     Host Room

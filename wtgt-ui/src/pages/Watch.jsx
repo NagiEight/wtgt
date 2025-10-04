@@ -7,7 +7,7 @@ const Watch = () => {
         <div className="flex h-full md:flex-row bg-(--color-bg) text-(--color-text)">
             <VideoPanel
                 title="DECO*27 - Monitoring (Best Friend Remix) feat. Hatsune Miku"
-                src="/media/episode1.mp4"
+                src=""
                 poster="/media/episode1-thumb.jpg"
 
             />
