@@ -123,159 +123,22 @@ wss.on("connection", (client, req) => {
         }
 
         switch(ContentJSON.type) {
-            /**
-             *  { //Note: Server will not return anything in this type of message.
-             *      "type": "host",
-             *      "content": {
-             *          "MediaName": "helloworld.mp4",
-             *          "IsPaused": true
-             *      }
-             *  }
-             *  
-             *  //server-to-admin:
-             *  {
-             *      "type": "userHost",
-             *      "content": {
-             *          "MediaName": "helloworld.mp4",
-             *          "IsPaused": false,
-             *          "Host": "userID"
-             *      }
-             *  }
-             */
             case "host":
                 host(ContentJSON, client, UserID);
                 break;
 
-            /** //client-to-server:
-             *  {
-             *      "type": "join",
-             *      "content": "RoomID"
-             *  }
-             * 
-             *  //server-to-client:
-             *  { //this one is for the joined member
-             *      "type": "init",
-             *      "content": {
-             *          "CurrentMedia": "helloworld.mp4",
-             *          "IsPaused": false,
-             *          "Mods": ["ModID1", "ModID2"],
-             *          "Members": {
-             *              "MemberID1": {
-             *                  "UserName": "Nagi Eight",
-             *                  "Avt": "avt"
-             *              }
-             *          },
-             *          "Messages": {
-             *              "MessageID1": {
-             *                  "Sender": "MemberID1",
-             *                  "Text": "hello world!",
-             *                  "Timestamp": "timestamp"
-             *              }
-             *          }
-             *      }
-             *  }
-             *  { //this one is for the other members of the room
-             *      "type": "join",
-             *      "content": {
-             *          "UserID": "UserID",
-             *          "UserName": "Claire Iidea",
-             *          "Avt": "avt"
-             *      }
-             *  }
-             * 
-             *  //server-to-admin:
-             *  {
-             *      "type": "userJoin",
-             "      "content": "roomID"
-             *  }
-             */
             case "join":
                 join(ContentJSON, client, UserID);
                 break;
 
-            /** //client-to-server:
-             *  {
-             *      "type": "message",
-             *      "content": "Hello World!"
-             *  }
-             * 
-             *  //server-to-client:
-             *  {
-             *      "type": "message",
-             *      "content": {
-             *          "MessageID": "MessageID",
-             *          "MessageObject": {
-             *              "Sender": "SenderID",
-             *              "Text": "Hello World!",
-             *              "Timestamp": "timestamp"
-             *          }
-             *      }
-             *  }
-             * 
-             *  //server-to-admin
-             *  {
-             *      "type": "userMessage",
-             *      "content": {
-             *          "RoomID": "roomID",
-             *          "MessageID": "messageID",
-             *          "MessageObject": {
-             *              "Sender": "userID",
-             *              "Text": "hello world!",
-             *              "Timestamp": "somethingsomething"
-             *          }
-             *      }
-             *  }
-             */
             case "message":
                 sendMessage(ContentJSON, client, UserID);
                 break;
 
-            /**
-             *  {
-             *      "type": "election",
-             *      "content": "UserID"
-             *  }
-             * 
-             *  //server-to-admin
-             *  {
-             *      type: "userElection",
-             *      content: {
-             *          "RoomID": "roomID",
-             *          "Target": "userID"
-             *      }
-             *  }
-             */
             case "election":
                 election(ContentJSON, client, UserID);
                 break;
             
-            /** //client-to-server:
-             *  {
-             *      "type": "leave"
-             *  }
-             * 
-             *  //server-to-client:
-             *  {
-             *      "type": "leave",
-             *      "content": "UserID"
-             *  }
-             *  { //this one is when the host leave
-             *      "type": "end"
-             *  }
-             * 
-             *  //server-to-admin:
-             *  {
-             *      "type": "roomEnd",
-             *      "content": "roomID"
-             *  }
-             *  {
-             *      type: "memberLeave",
-             *      content: {
-             *          "RoomID": "roomID",
-             *          "UserID": "userID"
-             *      }
-             *  }
-             */
             case "leave":
                 if(!utils.validateMessage(ContentJSON, { type: "test" })) {
                     sendError(client, `Invalid message format for ${ContentJSON.type}.`, UserID);
@@ -284,40 +147,10 @@ wss.on("connection", (client, req) => {
                 leave(client, UserID);
                 break;
             
-            /**
-             *  {
-             *      "type": "pause",
-             *      "content": false
-             *  }
-             * 
-             *  //server-to-admin
-             *  {
-             *      "type": "userPause",
-             *      "content": {
-             *          "RoomID": "roomID",
-             *          "IsPaused": false
-             *      }
-             *  }
-             */
             case "pause":
                 pause(ContentJSON, client, UserID);
                 break;
 
-            /**
-             *  {
-             *      "type": "sync",
-             *      "content": 69420
-             *  }
-             * 
-             *  //server-to-admin:
-             *  {
-             *      "type": "userSync",
-             *      "content": {
-             *          "RoomID": "roomID",
-             *          "Timestamp": 69420
-             *      }
-             *  }
-             */
             case "sync":
                 sync(ContentJSON, client, UserID);
                 break;
@@ -608,6 +441,27 @@ const sendError = (client, message, UserID) => {
     Logs.addEntry("", "error", UserID, { message })
 };
 
+/**
+ *  ```json
+ *  { //Note: Server will not return anything in this type of message.  
+ *      "type": "host",  
+ *      "content": {  
+ *          "MediaName": "helloworld.mp4",  
+ *          "IsPaused": true  
+ *      }  
+ *  }  
+ *  
+ *  //server-to-admin:  
+ *  {  
+ *      "type": "userHost",  
+ *      "content": {  
+ *          "MediaName": "helloworld.mp4",  
+ *          "IsPaused": false,  
+ *          "Host": "userID"  
+ *      }  
+ *  }
+ *  ```
+ */
 const host = (ContentJSON, client, UserID) => {
     if(!utils.validateMessage(ContentJSON, { type: "test", content: { MediaName: "test", IsPaused: true }})) {
         sendError(client, `Invalid message format for ${ContentJSON.type}.`, UserID);
@@ -641,6 +495,53 @@ const host = (ContentJSON, client, UserID) => {
     Logs.addEntry(UserID, "host", UserID);
 };
 
+/**
+ *  ```json
+ *  //client-to-server:
+ *  {
+ *      "type": "join",
+ *      "content": "RoomID"
+ *  }
+ * 
+ *  //server-to-client:
+ *  { //this one is for the joined member
+ *      "type": "init",
+ *      "content": {
+ *          "CurrentMedia": "helloworld.mp4",
+ *          "IsPaused": false,
+ *          "Mods": ["ModID1", "ModID2"],
+ *          "Members": {
+ *              "MemberID1": {
+ *                  "UserName": "Nagi Eight",
+ *                  "Avt": "avt"
+ *              }
+ *          },
+ *          "Messages": {
+ *              "MessageID1": {
+ *                  "Sender": "MemberID1",
+ *                  "Text": "hello world!",
+ *                  "Timestamp": "timestamp"
+ *              }
+ *          }
+ *      }
+ *  }
+ * 
+ *  { //this one is for the other members of the room
+ *      "type": "join",
+ *      "content": {
+ *          "UserID": "UserID",
+ *          "UserName": "Claire Iidea",
+ *          "Avt": "avt"
+ *      }
+ *  }
+ * 
+ *  //server-to-admin:
+ *  {
+ *      "type": "userJoin",
+ *      "content": "roomID"
+ *  }
+ *  ```
+ */
 const join = (ContentJSON, client, UserID) => {
     if(!utils.validateMessage(ContentJSON, { type: "test", content: "test" })) {
         sendError(client, `Invalid message format for ${ContentJSON.type}.`, UserID);
@@ -696,6 +597,42 @@ const join = (ContentJSON, client, UserID) => {
     Logs.addEntry(members[UserID].In, "join", UserID);
 };
 
+/** 
+ *  ```json
+ *  //client-to-server:
+ *  {
+ *      "type": "message",
+ *      "content": "Hello World!"
+ *  }
+ * 
+ *  //server-to-client:
+ *  {
+ *      "type": "message",
+ *      "content": {
+ *          "MessageID": "MessageID",
+ *          "MessageObject": {
+ *              "Sender": "SenderID",
+ *              "Text": "Hello World!",
+ *              "Timestamp": "timestamp"
+ *          }
+ *      }
+ *  }
+ * 
+ *  //server-to-admin
+ *  {
+ *      "type": "userMessage",
+ *      "content": {
+ *          "RoomID": "roomID",
+ *          "MessageID": "messageID",
+ *          "MessageObject": {
+ *              "Sender": "userID",
+ *              "Text": "hello world!",
+ *              "Timestamp": "somethingsomething"
+ *          }
+ *      }
+ *  }
+ *  ```
+ */
 const sendMessage = (ContentJSON, client, UserID) => {
     if(!utils.validateMessage(ContentJSON, { type: "test", content: "test" })) {
         sendError(client, `Invalid message format for ${ContentJSON.type}.`, UserID);
@@ -737,6 +674,23 @@ const sendMessage = (ContentJSON, client, UserID) => {
     Logs.addEntry(RoomID, "message", UserID, { text: ContentJSON.content });
 };
 
+/**
+ *  ```json
+ *  {
+ *      "type": "election",
+ *      "content": "UserID"
+ *  }
+ * 
+ *  //server-to-admin
+ *  {
+ *      "type": "userElection",
+ *      "content": {
+ *          "RoomID": "roomID",
+ *          "Target": "userID"
+ *      }
+ *  }
+ *  ```
+ */
 const election = (ContentJSON, client, UserID) => {
     if(!utils.validateMessage(ContentJSON, { type: "test", content: "test" })) {
         sendError(client, `Invalid message format for ${ContentJSON.type}.`, UserID);
@@ -776,6 +730,36 @@ const election = (ContentJSON, client, UserID) => {
     }
 };
 
+/** 
+ *  ```json
+ *  //client-to-server:
+ *  {
+ *      "type": "leave"
+ *  }
+ * 
+ *  //server-to-client:
+ *  {
+ *      "type": "leave",
+ *      "content": "UserID"
+ *  }
+ *  { //this one is when the host leave
+ *      "type": "end"
+ *  }
+ * 
+ *  //server-to-admin:
+ *  {
+ *      "type": "roomEnd",
+ *      "content": "roomID"
+ *  }
+ *  {
+ *      "type": "memberLeave",
+ *      "content": {
+ *          "RoomID": "roomID",
+ *          "UserID": "userID"
+ *      }
+ *  }
+ *  ```
+ */
 const leave = (client, UserID) => {
     const isInRoom = members[UserID].In !== "";
     if(!isInRoom) {
@@ -816,6 +800,23 @@ const leave = (client, UserID) => {
     }
 };
 
+/**
+ *  ```json
+ *  {
+ *      "type": "pause",
+ *      "content": false
+ *  }
+ * 
+ *  //server-to-admin
+ *  {
+ *      "type": "userPause",
+ *      "content": {
+ *          "RoomID": "roomID",
+ *          "IsPaused": false
+ *      }
+ *  }
+ *  ```
+ */
 const pause = (ContentJSON, client, UserID) => {
     if(!utils.validateMessage(ContentJSON, { type: "test", content: true })) {
         sendError(client, `Invalid message format for ${ContentJSON.type}.`, UserID);
@@ -841,6 +842,23 @@ const pause = (ContentJSON, client, UserID) => {
     Logs.addEntry(RoomID, "pause", UserID);
 };
 
+/**
+ *  ```json
+ *  {
+ *      "type": "sync",
+ *      "content": 69420
+ *  }
+ * 
+ *  //server-to-admin:
+ *  {
+ *      "type": "userSync",
+ *      "content": {
+ *          "RoomID": "roomID",
+ *          "Timestamp": 69420
+ *      }
+ *  }
+ *  ```
+ */
 const sync = (ContentJSON, client, UserID) => {
     if(!utils.validateMessage(ContentJSON, { type: "test", content: 1 })) {
         sendError(client, `Invalid message format for ${ContentJSON.type}.`, UserID);
