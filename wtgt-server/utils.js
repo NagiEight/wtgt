@@ -1,14 +1,15 @@
 const crypto = require("crypto");
 
 /**
- * @param {Object} a 
- * @param {Object} b 
+ * @param {Object} a First Object.
+ * @param {Object} b Second Object.
+ * @param {boolean} strict whether to ignore extra keys or not
  * @returns Whether 2 objects has the same keys in them. (Order insensitive)
  */
-const sameKeys = (a, b) => {
+const sameKeys = (a, b, strict = true) => {
     const ka = Object.keys(a).sort();
     const kb = Object.keys(b).sort();
-    return ka.length === kb.length && ka.every((k, i) => k === kb[i]);
+    return (ka.length === kb.length || strict) && ka.every((k, i) => k === kb[i]);
 };
 
 /**

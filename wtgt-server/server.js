@@ -11,39 +11,48 @@ const
 //Constants
 const
     PORT = 3000,
+    /**
+     *  ```js
+     *  roomID: {
+     *      currentMedia: "medianame.mp4",
+     *      mods: [],
+     *      members: [memberIDs],
+     *      isPaused: false,
+     *      messages: {
+     *          messageID: {
+     *              Sender: "memberID",
+     *              Text: "hello world!",
+     *              Timestamp: "somethingsomething"
+     *          }
+     *      }
+     *  }
+     *  ```
+     */
     rooms = {
-        /**
-         *  roomID (will be the same as the host's id): {
-         *      currentMedia: "medianame.mp4",
-         *      mods: [],
-         *      members: [...memberIDs],
-         *      isPaused: false,
-         *      messages: {
-         *          messageID: {
-         *              Sender: "memberID",
-         *              Text: "hello world!",
-         *              Timestamp: "somethingsomething"
-         *          }
-         *      }
-         *  }
-         */
+
     },
+    /**
+     *  ```js
+     *  MemberID: {
+     *      UserName: "Claire Iidea",
+     *      In: "roomID",
+     *      Socket: wsObj,
+     *      Avt: "uri"
+     *  }
+     *  ```
+    */
     members = {
-        /**
-         *  MemberID: {
-         *      UserName: "Claire Iidea",
-         *      In: "roomID",
-         *      Socket: wsObj,
-         *      Avt: "uri"
-         *  }
-        */
+
     },
     server = http.createServer((req, res) => {
 
     }),
     wss = new ws.Server({ server }),
     passwordPath = "./credentials/password.txt",
-    maximumAdminLoginAttempts = 5
+    maximumAdminLoginAttempts = 5,
+    defaultConfig = {
+        
+    }
 ;
 
 //runtime variables
