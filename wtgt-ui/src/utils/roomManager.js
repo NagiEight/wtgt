@@ -1,9 +1,5 @@
-// wsClient.js
-
-// import { useNavigate } from "react-router-dom";
 let ws = null;
 let mediaName = '';
-// const navigate = useNavigate();
 export const initSocket = (serverIp) => {
     if (!ws || ws.readyState === WebSocket.CLOSED) {
         ws = new WebSocket(serverIp);
@@ -49,6 +45,7 @@ const host = async (MediaName, IsPaused) => {
     }
 }
 
+
 /**
  * @param {string} roomID
  */
@@ -61,7 +58,7 @@ const join = async (roomID) => {
     }
 
     ws.onmessage = (message) => {
-        mediaName = JSON.parse(message.data).content.CurrentMedia;
+        mediaName = JSON.parse(message.data).content;
         console.log('Received message:', mediaName);
     }
 }
