@@ -773,13 +773,13 @@ const leave = (client, UserID) => {
         sendError(client, `Member ${UserID} does not belong to a room.`, UserID);
         return;
     }
+
     const RoomID = members[UserID].In;
     if(UserID === RoomID) {
-        broadcastToRoom(members[UserID].In, {type: "end"});
+        broadcastToRoom(RoomID, {type: "end"});
         
-        for(const MemberID of rooms[members[UserID].In].members) {
+        for(const MemberID of rooms[members[UserID].In].members)
             members[MemberID].In = "";
-        }
 
         delete rooms[RoomID];
 
@@ -792,7 +792,7 @@ const leave = (client, UserID) => {
     }
     else {
         rooms[RoomID].members = rooms[RoomID].members.filter(member => member !== UserID);
-        broadcastToRoom(members[UserID].In, {type: "leave", content: UserID});
+        broadcastToRoom(RoomID, {type: "leave", content: UserID});
         members[UserID].In = "";
 
         sendAdminMessage({
@@ -829,12 +829,12 @@ const pause = (ContentJSON, client, UserID) => {
         sendError(client, `Invalid message format for ${ContentJSON.type}.`, UserID);
         return;
     }
-
-    if(!UserID === members[UserID].In) {
+    
+    const RoomID = members[UserID].In;
+    if(UserID !== RoomID) {
         sendError(client, "Insufficient permission.", UserID);
         return;
     }
-    const RoomID = members[UserID].In;
     rooms[RoomID].isPaused = ContentJSON.content;
     broadcastToRoom(RoomID, ContentJSON);
 
@@ -871,8 +871,9 @@ const sync = (ContentJSON, client, UserID) => {
         sendError(client, `Invalid message format for ${ContentJSON.type}.`, UserID);
         return;
     }
+
     const RoomID = members[UserID].In;
-    if(!UserID === RoomID) {
+    if(UserID !== RoomID) {
         sendError(client, "Insufficient permission.", UserID);
         return;
     }
