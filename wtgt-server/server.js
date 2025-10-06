@@ -389,8 +389,8 @@ const Logs = class {
 
 const shutdown = () => {
     console.log('Shutting down gracefully...');
-    server.close(() => {
-        Logs.createLog();
+    server.close(async () => {
+        await Logs.createLog();
         console.log('All connections closed, exiting.');
         process.exit(0);
     });
