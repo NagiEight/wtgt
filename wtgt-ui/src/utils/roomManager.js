@@ -1,5 +1,5 @@
 let ws = null;
-let mediaName = '';
+let messageContent = '';
 export const initSocket = (serverIp) => {
     if (!ws || ws.readyState === WebSocket.CLOSED) {
         ws = new WebSocket(serverIp);
@@ -58,13 +58,13 @@ const join = async (roomID) => {
     }
 
     ws.onmessage = (message) => {
-        mediaName = JSON.parse(message.data).content;
-        console.log('Received message:', mediaName);
+        messageContent = JSON.parse(message.data).content;
+        console.log('Received message:', messageContent);
     }
 }
 
 const getMediaName = () => {
-    return mediaName;
+    return messageContent;
 }
 
 

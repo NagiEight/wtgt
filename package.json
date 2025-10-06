@@ -8,6 +8,25 @@
   "dependencies": {
     "@tailwindcss/vite": "^4.1.13",
     "react-router-dom": "^7.9.1",
-    "tailwindcss": "^4.1.13"
-  }
+    "tailwindcss": "^4.1.13",
+    "ws": "^8.18.3"
+  },
+  "name": "wtgt",
+  "version": "1.0.0",
+  "description": "A cozy \"Watch Together\" app built with React, Vite, Tailwind CSS, and Node.js.  \r Perfect for virtual movie nights, synced playback, and real-time chat with friends",
+  "main": "backend.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/NagiEight/wtgt.git"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/NagiEight/wtgt/issues"
+  },
+  "homepage": "https://github.com/NagiEight/wtgt#readme"
 }
