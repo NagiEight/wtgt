@@ -591,8 +591,8 @@ const join = (ContentJSON, client, UserID) => {
         type: "join",
         content: {
             UserID,
-            UserName: userProfile["UserName"],
-            Avt: userProfile["Avt"]
+            UserName: members[UserID].UserName,
+            Avt: members[UserID].Avt
         }
     }, UserID);
 
