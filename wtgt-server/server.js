@@ -15,6 +15,7 @@ const
      *  ```js
      *  roomID: {
      *      currentMedia: "medianame.mp4",
+     *      host: "hostID"
      *      mods: [],
      *      members: [memberIDs],
      *      isPaused: false,
@@ -75,8 +76,9 @@ wss.on("connection", (client, req) => {
         },
         UserID = crypto.randomUUID()
     ;
-
-    while(Object.keys(members).includes(UserID))
+    
+    const users = Object.keys(members);
+    while(users.includes(UserID))
         UserID = crypto.randomUUID();
 
     let adminLoginAttempts = 0;
@@ -138,6 +140,10 @@ wss.on("connection", (client, req) => {
 
             case "election":
                 election(ContentJSON, client, UserID);
+                break;
+            
+            case "demotion":
+                demotion(ContentJSON, client, UserID);
                 break;
             
             case "leave":
@@ -256,6 +262,7 @@ const Logs = class {
         connection: " connected.",
         disconnection: " disconnected.",
         election: " elected to modertor.",
+        demotion: " demoted by the host.",
         host: " hosted a new room.",
         join: " joined.",
         leave: " left.",
@@ -271,7 +278,7 @@ const Logs = class {
      * Add a new entry to the logs.
      * 
      * @param {string} roomID 
-     * @param {"connection" | "disconnection" | "election" | "host" | "message" | "join" | "leave" | "pause" | "sync" | "end" | "error"} entryType 
+     * @param {"connection" | "disconnection" | "election" | "demotion" | "host" | "message" | "join" | "leave" | "pause" | "sync" | "end" | "error"} entryType 
      * @param {string} entryTarget 
      * @param {Object} extras 
      */
@@ -280,6 +287,7 @@ const Logs = class {
             "connection",
             "disconnection",
             "election",
+            "demotion",
             "host",
             "message",
             "join",
@@ -388,8 +396,8 @@ const Logs = class {
 
 const shutdown = () => {
     console.log('Shutting down gracefully...');
-    server.close(() => {
-        Logs.createLog();
+    server.close(async () => {
+        await Logs.createLog();
         console.log('All connections closed, exiting.');
         process.exit(0);
     });
@@ -462,6 +470,7 @@ const sendError = (client, message, UserID) => {
  *  {  
  *      "type": "userHost",  
  *      "content": {  
+ *          "RoomID": "roomID"
  *          "MediaName": "helloworld.mp4",  
  *          "IsPaused": false,  
  *          "Host": "userID"  
@@ -475,16 +484,22 @@ const host = (ContentJSON, client, UserID) => {
         return;
     }
     const isInRoom = members[UserID].In !== "";
+    let RoomID = crypto.randomUUID();
+
+    const rooms = Object.keys(rooms);
+    while(rooms.includes(RoomID))
+        RoomID = crypto.randomUUID();
 
     if(isInRoom) {
         sendError(client, `Member ${UserID} is already belong to a room.`, UserID);
         return;
     }
 
-    members[UserID].In = UserID;
-    rooms[UserID] = {
+    members[roomID].In = UserID;
+    rooms[roomID] = {
         currentMedia: ContentJSON.content.MediaName,
         isPaused: ContentJSON.content.IsPaused,
+        host: UserID,
         mods: [],
         members: [UserID],
         messages: {}
@@ -493,13 +508,14 @@ const host = (ContentJSON, client, UserID) => {
     sendAdminMessage({
         type: "userHost",
         content: {
+            RoomID,
             MediaName: ContentJSON.content.MediaName,
             IsPaused: ContentJSON.content.IsPaused,
             Host: UserID
         }
     });
 
-    Logs.addEntry(UserID, "host", UserID);
+    Logs.addEntry(roomID, "host", UserID);
 };
 
 /**
@@ -516,6 +532,7 @@ const host = (ContentJSON, client, UserID) => {
  *      "content": {
  *          "CurrentMedia": "helloworld.mp4",
  *          "IsPaused": false,
+ *          "Host": "hostID",
  *          "Mods": ["ModID1", "ModID2"],
  *          "Members": {
  *              "MemberID1": {
@@ -579,7 +596,7 @@ const join = (ContentJSON, client, UserID) => {
         };
     }
 
-    client.send(JSON.stringify({type: "init", content: {
+    client.send(JSON.stringify({ type: "init", content: {
         CurrentMedia: currentRoom.MediaName,
         IsPaused: currentRoom.IsPaused,
         Mods: currentRoom.mods,
@@ -598,7 +615,10 @@ const join = (ContentJSON, client, UserID) => {
 
     sendAdminMessage({
         type: "userJoin",
-        content: ContentJSON.content
+        content: {
+            UserID,
+            Target: ContentJSON.content
+        }
     });
 
     Logs.addEntry(members[UserID].In, "join", UserID);
@@ -624,20 +644,6 @@ const join = (ContentJSON, client, UserID) => {
  *          }
  *      }
  *  }
- * 
- *  //server-to-admin
- *  {
- *      "type": "userMessage",
- *      "content": {
- *          "RoomID": "roomID",
- *          "MessageID": "messageID",
- *          "MessageObject": {
- *              "Sender": "userID",
- *              "Text": "hello world!",
- *              "Timestamp": "somethingsomething"
- *          }
- *      }
- *  }
  *  ```
  */
 const sendMessage = (ContentJSON, client, UserID) => {
@@ -645,34 +651,29 @@ const sendMessage = (ContentJSON, client, UserID) => {
         sendError(client, `Invalid message format for ${ContentJSON.type}.`, UserID);
         return;
     }
-    const isInRoom = members[UserID].In !== "";
+    const 
+        RoomID = members[UserID].In,
+        isInRoom = RoomID !== ""
+    ;
 
     if(!isInRoom) {
         sendError(client, `Member ${UserID} does not belong to a room.`, UserID);
         return;
     }
-    const RoomID = members[UserID].In;
-    const MessageID = sha256Hash(UserID + ContentJSON.content + Object.keys(rooms[RoomID].messages).length.toString());
-    const MessageObject = {
-        Sender: UserID,
-        Text: ContentJSON.content,
-        Timestamp: getCurrentTime()
-    };
+    const 
+        MessageID = sha256Hash(UserID + ContentJSON.content + Object.keys(rooms[RoomID].messages).length.toString()),
+        MessageObject = {
+            Sender: UserID,
+            Text: ContentJSON.content,
+            Timestamp: getCurrentTime()
+        }
+    ;
         
     rooms[RoomID].messages[MessageID] = MessageObject;
 
     broadcastToRoom(members[UserID].In, {
         type: "message",
         content: {
-            MessageID,
-            MessageObject
-        }
-    });
-
-    sendAdminMessage({
-        type: "userMessage",
-        content: {
-            RoomID,
             MessageID,
             MessageObject
         }
@@ -705,12 +706,21 @@ const election = (ContentJSON, client, UserID) => {
     }
 
     const 
-        isMemberBelongToRoom = rooms[members[UserID].In].members.includes(ContentJSON.content),
-        isMemberAMod = rooms[members[UserID].In].mods.includes(ContentJSON.content),
-        isMemberHasPermission = members[UserID].In == UserID,
-        isEligibleForElection = isMemberBelongToRoom && !isMemberAMod && isMemberHasPermission,
-        RoomID = members[UserID].In
+        RoomID = members[UserID].In,
+        isInRoom = RoomID !== ""
     ;
+    if(!isInRoom) {
+        sendError(client, `Member ${UserID} does not belong to a room.`, UserID);
+        return;
+    }
+
+    const 
+        isMemberBelongToRoom = rooms[RoomID].members.includes(ContentJSON.content),
+        isMemberAMod = rooms[RoomID].mods.includes(ContentJSON.content),
+        doesMemberHasPermission = rooms[RoomID].host == UserID,
+        isEligibleForElection = isMemberBelongToRoom && !isMemberAMod && doesMemberHasPermission
+    ;
+
     if(isEligibleForElection) {
         rooms[RoomID].mods.push(ContentJSON.content);
 
@@ -726,11 +736,75 @@ const election = (ContentJSON, client, UserID) => {
 
         Logs.addEntry(RoomID, "election", ContentJSON.content);
     }
-    else if(!isMemberHasPermission) {
+    else if(!doesMemberHasPermission) {
         sendError(client, `Insufficient permission.`, UserID);
     }
     else if(isMemberAMod) {
         sendError(client, `Member ${ContentJSON.content} is already a moderator.`, UserID);
+    }
+    else {
+        sendError(client, `Unknown member ${ContentJSON.content}: Member does not exist or does not belong to this room.`, UserID);
+    }
+};
+
+/**
+ *  ```json
+ *  {
+ *      "type": "demotion",
+ *      "content": "memberID"
+ *  }
+ * 
+ *  { //Server-to-admin
+ *      "type": "demotion",
+ *      "content": {
+ *          "RoomID": "roomID",
+ *          "Target": "userID"
+ *      }
+ *  }
+ *  ```
+ */
+const demotion = (ContentJSON, client, UserID) => {
+    if(!utils.validateMessage(ContentJSON, { type: "test", content: "test" })) {
+        sendError(client, `Invalid message format for ${ContentJSON.type}.`, UserID);
+        return;
+    }
+
+    const 
+        RoomID = members[UserID].In,
+        isInRoom = RoomID !== ""
+    ;
+    if(!isInRoom) {
+        sendError(client, `Member ${UserID} does not belong to a room.`, UserID);
+        return;
+    }
+        
+    const
+        isMemberBelongToRoom = rooms[RoomID].members.includes(ContentJSON.content),
+        isMemberAMod = rooms[RoomID].mods.includes(ContentJSON.content),
+        doesMemberHasPermission = rooms[RoomID].host == UserID,
+        isEligibleForDemotion = isMemberBelongToRoom && isMemberAMod && doesMemberHasPermission
+    ;
+
+    if(isEligibleForDemotion) {
+        rooms[RoomID].mods = rooms[RoomID].mods.filter(member => member !== ContentJSON.content);
+
+        broadcastToRoom(RoomID, ContentJSON);
+
+        sendAdminMessage({
+            type: "userDemotion",
+            content: {
+                RoomID,
+                Target: ContentJSON.content
+            }
+        });
+
+        Logs.addEntry(RoomID, "demotion", ContentJSON.content);
+    }
+    else if(!doesMemberHasPermission) {
+        sendError(client, `Insufficient permission.`, UserID);
+    }
+    else if(!isMemberAMod) {
+        sendError(client, `Member ${ContentJSON.content} is not a moderator.`, UserID);
     }
     else {
         sendError(client, `Unknown member ${ContentJSON.content}: Member does not exist or does not belong to this room.`, UserID);
@@ -773,13 +847,13 @@ const leave = (client, UserID) => {
         sendError(client, `Member ${UserID} does not belong to a room.`, UserID);
         return;
     }
+
     const RoomID = members[UserID].In;
-    if(UserID === RoomID) {
-        broadcastToRoom(members[UserID].In, {type: "end"});
+    if(UserID === rooms[RoomID].host) {
+        broadcastToRoom(RoomID, {type: "end"});
         
-        for(const MemberID of rooms[members[UserID].In].members) {
+        for(const MemberID of rooms[RoomID].members)
             members[MemberID].In = "";
-        }
 
         delete rooms[RoomID];
 
@@ -792,7 +866,7 @@ const leave = (client, UserID) => {
     }
     else {
         rooms[RoomID].members = rooms[RoomID].members.filter(member => member !== UserID);
-        broadcastToRoom(members[UserID].In, {type: "leave", content: UserID});
+        broadcastToRoom(RoomID, {type: "leave", content: UserID});
         members[UserID].In = "";
 
         sendAdminMessage({
@@ -813,15 +887,6 @@ const leave = (client, UserID) => {
  *      "type": "pause",
  *      "content": false
  *  }
- * 
- *  //server-to-admin
- *  {
- *      "type": "userPause",
- *      "content": {
- *          "RoomID": "roomID",
- *          "IsPaused": false
- *      }
- *  }
  *  ```
  */
 const pause = (ContentJSON, client, UserID) => {
@@ -829,22 +894,14 @@ const pause = (ContentJSON, client, UserID) => {
         sendError(client, `Invalid message format for ${ContentJSON.type}.`, UserID);
         return;
     }
-
-    if(!UserID === members[UserID].In) {
+    
+    const RoomID = members[UserID].In;
+    if(UserID !== rooms[RoomID].host) {
         sendError(client, "Insufficient permission.", UserID);
         return;
     }
-    const RoomID = members[UserID].In;
     rooms[RoomID].isPaused = ContentJSON.content;
     broadcastToRoom(RoomID, ContentJSON);
-
-    sendAdminMessage({
-        type: "userPause",
-        content: {
-            RoomID,
-            IsPaused: ContentJSON.content
-        }
-    });
 
     Logs.addEntry(RoomID, "pause", UserID);
 };
@@ -855,15 +912,6 @@ const pause = (ContentJSON, client, UserID) => {
  *      "type": "sync",
  *      "content": 69420
  *  }
- * 
- *  //server-to-admin:
- *  {
- *      "type": "userSync",
- *      "content": {
- *          "RoomID": "roomID",
- *          "Timestamp": 69420
- *      }
- *  }
  *  ```
  */
 const sync = (ContentJSON, client, UserID) => {
@@ -871,21 +919,14 @@ const sync = (ContentJSON, client, UserID) => {
         sendError(client, `Invalid message format for ${ContentJSON.type}.`, UserID);
         return;
     }
+
     const RoomID = members[UserID].In;
-    if(!UserID === RoomID) {
+    if(UserID !== rooms[RoomID].host) {
         sendError(client, "Insufficient permission.", UserID);
         return;
     }
 
     broadcastToRoom(RoomID, ContentJSON);
-
-    sendAdminMessage({
-        type: "userSync",
-        content: {
-            RoomID,
-            Timestamp: ContentJSON.content
-        }
-    });
 
     Logs.addEntry(RoomID, "sync", UserID, { to: ContentJSON.content });
 };
