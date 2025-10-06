@@ -624,20 +624,6 @@ const join = (ContentJSON, client, UserID) => {
  *          }
  *      }
  *  }
- * 
- *  //server-to-admin
- *  {
- *      "type": "userMessage",
- *      "content": {
- *          "RoomID": "roomID",
- *          "MessageID": "messageID",
- *          "MessageObject": {
- *              "Sender": "userID",
- *              "Text": "hello world!",
- *              "Timestamp": "somethingsomething"
- *          }
- *      }
- *  }
  *  ```
  */
 const sendMessage = (ContentJSON, client, UserID) => {
@@ -664,15 +650,6 @@ const sendMessage = (ContentJSON, client, UserID) => {
     broadcastToRoom(members[UserID].In, {
         type: "message",
         content: {
-            MessageID,
-            MessageObject
-        }
-    });
-
-    sendAdminMessage({
-        type: "userMessage",
-        content: {
-            RoomID,
             MessageID,
             MessageObject
         }
@@ -813,15 +790,6 @@ const leave = (client, UserID) => {
  *      "type": "pause",
  *      "content": false
  *  }
- * 
- *  //server-to-admin
- *  {
- *      "type": "userPause",
- *      "content": {
- *          "RoomID": "roomID",
- *          "IsPaused": false
- *      }
- *  }
  *  ```
  */
 const pause = (ContentJSON, client, UserID) => {
@@ -838,14 +806,6 @@ const pause = (ContentJSON, client, UserID) => {
     rooms[RoomID].isPaused = ContentJSON.content;
     broadcastToRoom(RoomID, ContentJSON);
 
-    sendAdminMessage({
-        type: "userPause",
-        content: {
-            RoomID,
-            IsPaused: ContentJSON.content
-        }
-    });
-
     Logs.addEntry(RoomID, "pause", UserID);
 };
 
@@ -854,15 +814,6 @@ const pause = (ContentJSON, client, UserID) => {
  *  {
  *      "type": "sync",
  *      "content": 69420
- *  }
- * 
- *  //server-to-admin:
- *  {
- *      "type": "userSync",
- *      "content": {
- *          "RoomID": "roomID",
- *          "Timestamp": 69420
- *      }
  *  }
  *  ```
  */
@@ -879,14 +830,6 @@ const sync = (ContentJSON, client, UserID) => {
     }
 
     broadcastToRoom(RoomID, ContentJSON);
-
-    sendAdminMessage({
-        type: "userSync",
-        content: {
-            RoomID,
-            Timestamp: ContentJSON.content
-        }
-    });
 
     Logs.addEntry(RoomID, "sync", UserID, { to: ContentJSON.content });
 };
