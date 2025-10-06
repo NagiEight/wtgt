@@ -476,7 +476,11 @@ const host = (ContentJSON, client, UserID) => {
         return;
     }
     const isInRoom = members[UserID].In !== "";
-    const roomID = crypto.randomUUID();
+    let roomID = crypto.randomUUID();
+
+    while(Object.keys(rooms).includes(roomID))
+        roomID = crypto.randomUUID();
+
     if(isInRoom) {
         sendError(client, `Member ${UserID} is already belong to a room.`, UserID);
         return;
