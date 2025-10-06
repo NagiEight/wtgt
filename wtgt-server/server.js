@@ -15,6 +15,7 @@ const
      *  ```js
      *  roomID: {
      *      currentMedia: "medianame.mp4",
+     *      host: "hostID"
      *      mods: [],
      *      members: [memberIDs],
      *      isPaused: false,
@@ -475,16 +476,17 @@ const host = (ContentJSON, client, UserID) => {
         return;
     }
     const isInRoom = members[UserID].In !== "";
-
+    const roomID = crypto.randomUUID();
     if(isInRoom) {
         sendError(client, `Member ${UserID} is already belong to a room.`, UserID);
         return;
     }
 
-    members[UserID].In = UserID;
-    rooms[UserID] = {
+    members[roomID].In = UserID;
+    rooms[roomID] = {
         currentMedia: ContentJSON.content.MediaName,
         isPaused: ContentJSON.content.IsPaused,
+        host: UserID,
         mods: [],
         members: [UserID],
         messages: {}
@@ -499,7 +501,7 @@ const host = (ContentJSON, client, UserID) => {
         }
     });
 
-    Logs.addEntry(UserID, "host", UserID);
+    Logs.addEntry(roomID, "host", UserID);
 };
 
 /**
@@ -516,6 +518,7 @@ const host = (ContentJSON, client, UserID) => {
  *      "content": {
  *          "CurrentMedia": "helloworld.mp4",
  *          "IsPaused": false,
+ *          "Host": "hostID",
  *          "Mods": ["ModID1", "ModID2"],
  *          "Members": {
  *              "MemberID1": {
@@ -579,7 +582,7 @@ const join = (ContentJSON, client, UserID) => {
         };
     }
 
-    client.send(JSON.stringify({type: "init", content: {
+    client.send(JSON.stringify({ type: "init", content: {
         CurrentMedia: currentRoom.MediaName,
         IsPaused: currentRoom.IsPaused,
         Mods: currentRoom.mods,
@@ -682,12 +685,13 @@ const election = (ContentJSON, client, UserID) => {
     }
 
     const 
-        isMemberBelongToRoom = rooms[members[UserID].In].members.includes(ContentJSON.content),
-        isMemberAMod = rooms[members[UserID].In].mods.includes(ContentJSON.content),
-        isMemberHasPermission = members[UserID].In == UserID,
-        isEligibleForElection = isMemberBelongToRoom && !isMemberAMod && isMemberHasPermission,
-        RoomID = members[UserID].In
+        RoomID = members[UserID].In,
+        isMemberBelongToRoom = rooms[RoomID].members.includes(ContentJSON.content),
+        isMemberAMod = rooms[RoomID].mods.includes(ContentJSON.content),
+        doesMemberHasPermission = rooms[RoomID].host == UserID,
+        isEligibleForElection = isMemberBelongToRoom && !isMemberAMod && doesMemberHasPermission
     ;
+
     if(isEligibleForElection) {
         rooms[RoomID].mods.push(ContentJSON.content);
 
@@ -703,7 +707,7 @@ const election = (ContentJSON, client, UserID) => {
 
         Logs.addEntry(RoomID, "election", ContentJSON.content);
     }
-    else if(!isMemberHasPermission) {
+    else if(!doesMemberHasPermission) {
         sendError(client, `Insufficient permission.`, UserID);
     }
     else if(isMemberAMod) {
@@ -752,7 +756,7 @@ const leave = (client, UserID) => {
     }
 
     const RoomID = members[UserID].In;
-    if(UserID === RoomID) {
+    if(UserID === rooms[RoomID].host) {
         broadcastToRoom(RoomID, {type: "end"});
         
         for(const MemberID of rooms[members[UserID].In].members)
@@ -799,7 +803,7 @@ const pause = (ContentJSON, client, UserID) => {
     }
     
     const RoomID = members[UserID].In;
-    if(UserID !== RoomID) {
+    if(UserID !== rooms[RoomID].host) {
         sendError(client, "Insufficient permission.", UserID);
         return;
     }
@@ -824,7 +828,7 @@ const sync = (ContentJSON, client, UserID) => {
     }
 
     const RoomID = members[UserID].In;
-    if(UserID !== RoomID) {
+    if(UserID !== rooms[RoomID].host) {
         sendError(client, "Insufficient permission.", UserID);
         return;
     }
