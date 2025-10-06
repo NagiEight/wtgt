@@ -76,8 +76,9 @@ wss.on("connection", (client, req) => {
         },
         UserID = crypto.randomUUID()
     ;
-
-    while(Object.keys(members).includes(UserID))
+    
+    const users = Object.keys(members);
+    while(users.includes(UserID))
         UserID = crypto.randomUUID();
 
     let adminLoginAttempts = 0;
@@ -478,7 +479,8 @@ const host = (ContentJSON, client, UserID) => {
     const isInRoom = members[UserID].In !== "";
     let roomID = crypto.randomUUID();
 
-    while(Object.keys(rooms).includes(roomID))
+    const rooms = Object.keys(rooms);
+    while(rooms.includes(roomID))
         roomID = crypto.randomUUID();
 
     if(isInRoom) {
