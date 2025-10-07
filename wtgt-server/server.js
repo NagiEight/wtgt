@@ -96,10 +96,10 @@ wss.on("connection", (client, req) => {
         userProfile = {
             UserName: url.searchParams.get("UserName"),
             Avt: url.searchParams.get("Avt")
-        },
-        UserID = crypto.randomUUID()
+        }
     ;
-    
+    let UserID = crypto.randomUUID();
+        
     const users = Object.keys(members);
     while(users.includes(UserID))
         UserID = crypto.randomUUID();
@@ -410,10 +410,10 @@ const Logs = class {
         let files;
 
         try {
-            files = await fs.readdir('./logs');
+            files = await fs.readdir("./logs");
         }
         catch(err) {
-            console.error('Error reading folder:', err);
+            console.error("Error reading folder:", err);
             return;
         }
         
@@ -435,10 +435,10 @@ const Logs = class {
 };
 
 const shutdown = () => {
-    console.log('Shutting down gracefully...');
+    console.log("Shutting down gracefully...");
     server.close(async () => {
         await Logs.createLog();
-        console.log('All connections closed, exiting.');
+        console.log("All connections closed, exiting.");
         process.exit(0);
     });
 }
@@ -449,24 +449,17 @@ const shutdown = () => {
 const getCurrentTime = () => {
     const
         now = new Date(),
-        hours = String(now.getHours()).padStart(2, '0'),
-        minutes = String(now.getMinutes()).padStart(2, '0'),
-        seconds = String(now.getSeconds()).padStart(2, '0'),
-        day = String(now.getDate()).padStart(2, '0'),
-        month = String(now.getMonth() + 1).padStart(2, '0'),
+        hours = String(now.getHours()).padStart(2, "0"),
+        minutes = String(now.getMinutes()).padStart(2, "0"),
+        seconds = String(now.getSeconds()).padStart(2, "0"),
+        day = String(now.getDate()).padStart(2, "0"),
+        month = String(now.getMonth() + 1).padStart(2, "0"),
         year = now.getFullYear()
     ;
 
     const formatted = `${hours}:${minutes}:${seconds} ${day}/${month}/${year}`;
 
     return formatted;
-};
-
-/**
- * Returns a SHA-256 hash of the given content.
- */
-const sha256Hash = (content) => {
-    return crypto.createHash("sha256").update(content).digest("hex");
 };
 
 const broadcastToRoom = (RoomID, message, except = null) => {
@@ -523,18 +516,19 @@ const host = (ContentJSON, client, UserID) => {
         sendError(client, `Invalid message format for ${ContentJSON.type}.`, UserID);
         return;
     }
+    
     const isInRoom = members[UserID].In !== "";
-    let RoomID = crypto.randomUUID();
-
-    const rooms = Object.keys(rooms);
-    while(rooms.includes(RoomID))
-        RoomID = crypto.randomUUID();
-
     if(isInRoom) {
         sendError(client, `Member ${UserID} is already belong to a room.`, UserID);
         return;
     }
 
+    let RoomID = crypto.randomUUID();
+    const rooms = Object.keys(rooms);
+
+    while(rooms.includes(RoomID))
+        RoomID = crypto.randomUUID();
+    
     members[RoomID].In = UserID;
     rooms[RoomID] = {
         currentMedia: ContentJSON.content.MediaName,
@@ -691,6 +685,7 @@ const sendMessage = (ContentJSON, client, UserID) => {
         sendError(client, `Invalid message format for ${ContentJSON.type}.`, UserID);
         return;
     }
+
     const 
         RoomID = members[UserID].In,
         isInRoom = RoomID !== ""
@@ -700,14 +695,18 @@ const sendMessage = (ContentJSON, client, UserID) => {
         sendError(client, `Member ${UserID} does not belong to a room.`, UserID);
         return;
     }
-    const 
-        MessageID = sha256Hash(UserID + ContentJSON.content + Object.keys(rooms[RoomID].messages).length.toString()),
-        MessageObject = {
-            Sender: UserID,
-            Text: ContentJSON.content,
-            Timestamp: getCurrentTime()
-        }
-    ;
+
+    let MessageID = crypto.randomUUID();
+    const messages = Object.keys(rooms[RoomID].messages);
+
+    while(messages.includes(MessageID))
+        MessageID = crypto.randomUUID();
+
+    const MessageObject = {
+        Sender: UserID,
+        Text: ContentJSON.content,
+        Timestamp: getCurrentTime()
+    };
         
     rooms[RoomID].messages[MessageID] = MessageObject;
 
@@ -994,28 +993,24 @@ const sendAdminMessage = (JSONContent) => {
     members[adminID].Socket.send(JSON.stringify(JSONContent));
 };
 
-server.on("close", () => {
-    Logs.createLog();
-});
-
 // Log creation and shutdown handling
 server.on("close", Logs.createLog);
 
-server.on('error', (err) => {
-    console.error('Server error:', err);
+server.on("error", (err) => {
+    console.error("Server error:", err);
     shutdown();
 });
 
-process.on('SIGINT', shutdown);
-process.on('SIGTERM', shutdown);
+process.on("SIGINT", shutdown);
+process.on("SIGTERM", shutdown);
 
-process.on('uncaughtException', (err) => {
-    console.error('Uncaught Exception:', err);
+process.on("uncaughtException", (err) => {
+    console.error("Uncaught Exception:", err);
     shutdown();
 });
 
-process.on('unhandledRejection', (reason) => {
-    console.error('Unhandled Rejection:', reason);
+process.on("unhandledRejection", (reason) => {
+    console.error("Unhandled Rejection:", reason);
     shutdown();
 });
 
