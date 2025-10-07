@@ -258,10 +258,27 @@ wss.on("connection", (client, req) => {
                     break;
                 }
                 if(UserID !== adminID) {
-                    sendError(client, "Trying to logout while not being an admin.", UserID);
+                    sendError(client, "Trying to logout while not being a server admin.", UserID);
                     break;
                 }
                 adminID = "";
+                break;
+            
+            /** //Note: Server will not return anything in this type of message.
+             *  {
+             *      "type": "shutdown"
+             *  }
+             */
+            case "shutdown":
+                if(!utils.validateMessage(ContentJSON, { type: "test" })) {
+                    sendError(client, `Invalid message format for ${ContentJSON.type}.`, UserID);
+                    break;
+                }
+                if(UserID !== adminID) {
+                    sendError(client, "Insufficient permission.", UserID);
+                    break;
+                }
+                server.close();
                 break;
 
             default:
