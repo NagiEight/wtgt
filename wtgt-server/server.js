@@ -41,7 +41,7 @@ const
      *      Avt: "uri"
      *  }
      *  ```
-    */
+     */
     members = {
 
     },
@@ -234,15 +234,23 @@ wss.on("connection", (client, req) => {
                     sendError(client, `Invalid message format for ${ContentJSON.type}.`, UserID);
                     break;
                 }
+
+                if(adminID !== "") {
+                    sendError(client, `Already exist an admin session with the UUID of ${adminID}.`, UserID);
+                    break;
+                }
+
                 if(adminLoginAttempts > config.maxAdminLoginAttempts) {
                     sendError(client, "Exceeded the login attempt count, cannot continue.", UserID);
                     break;
                 }
+
                 if(ContentJSON.content !== credentials) {
                     adminLoginAttempts += 1;
                     sendError(client, "Incorrect admin password, please try again.", UserID);
                     break;
                 }
+
                 adminLoginAttempts = 0;
                 adminLogin(UserID, client);
                 break;
