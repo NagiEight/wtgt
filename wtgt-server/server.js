@@ -46,25 +46,48 @@ const
 
     },
     server = http.createServer((req, res) => {
-
+        
     }),
     wss = new ws.Server({ server }),
-    passwordPath = "./credentials/password.txt",
-    maximumAdminLoginAttempts = 5,
+    propertiesPath = "./server-properties",
     defaultConfig = {
-        
+        adminPasswordLength: 16,
+        maxAdminLoginAttempts: 5
     }
 ;
-
-//runtime variables
-let 
+    
+    //runtime variables
+let
     credentials = "",
-    adminID = ""
+    adminID = "",
+    config
 ;
 
 (async () => {
-    credentials = utils.generatePassword();
-    await fs.writeFile(passwordPath, credentials, "utf-8");
+    
+    let file;
+    
+    try {
+        file = await fs.open(`${propertiesPath}/config.json`, "w+");
+        const content = await file.read({ encoding: "utf-8" });
+        config = JSON.stringify(content);
+
+        if(!utils.validateMessage(config, defaultConfig)) {
+            await file.write(defaultConfig);
+            config = defaultConfig;
+        }
+    }
+    catch(err) {
+        console.error(`Error when reading file: ${err}`);
+        await file.write(defaultConfig);
+        config = defaultConfig;
+    }
+    finally {
+        await file.close();
+    }
+
+    credentials = utils.generatePassword(config.adminPasswordLength);
+    await fs.writeFile(`${propertiesPath}/password.txt`, credentials, "utf-8");
 })();
 
 wss.on("connection", (client, req) => {
@@ -211,11 +234,11 @@ wss.on("connection", (client, req) => {
                     sendError(client, `Invalid message format for ${ContentJSON.type}.`, UserID);
                     break;
                 }
-                if(adminLoginAttempts > maximumAdminLoginAttempts) {
+                if(adminLoginAttempts > config.maxAdminLoginAttempts) {
                     sendError(client, "Exceeded the login attempt count, cannot continue.", UserID);
                     break;
                 }
-                if(!ContentJSON.content === credentials) {
+                if(ContentJSON.content !== credentials) {
                     adminLoginAttempts += 1;
                     sendError(client, "Incorrect admin password, please try again.", UserID);
                     break;
@@ -234,7 +257,7 @@ wss.on("connection", (client, req) => {
                     sendError(client, `Invalid message format for ${ContentJSON.type}.`, UserID);
                     break;
                 }
-                if(!UserID === adminID) {
+                if(UserID !== adminID) {
                     sendError(client, "Trying to logout while not being an admin.", UserID);
                     break;
                 }
@@ -367,27 +390,27 @@ const Logs = class {
      */
     static createLog = async () => {
         await fs.mkdir("logs", { recursive: true });
-    
+        let files;
+
+        try {
+            files = await fs.readdir('./logs');
+        }
+        catch(err) {
+            console.error('Error reading folder:', err);
+            return;
+        }
+        
         const logstring = Logs.toString();
-    
+        
         let
-            logID = sha256Hash(getCurrentTime()),
+            logID = crypto.randomUUID(),
             fileName = `${logID}.log`,
-            filePath = path.join("logs", fileName),
-            counter = 1
+            filePath = path.join("logs", fileName)
         ;
-    
-        while(true) {
-            try {
-                await fs.access(filePath);
-    
-                fileName = `${logID}_${counter}.log`;
-                filePath = path.join("logs", fileName);
-                ++counter;
-            }
-            catch {
-                break;
-            }
+
+        while(files.includes(fileName)) {
+            logID = crypto.randomUUID();
+            fileName = `${logID}.log`;
         }
     
         await fs.writeFile(filePath, logstring, "utf-8");
@@ -495,8 +518,8 @@ const host = (ContentJSON, client, UserID) => {
         return;
     }
 
-    members[roomID].In = UserID;
-    rooms[roomID] = {
+    members[RoomID].In = UserID;
+    rooms[RoomID] = {
         currentMedia: ContentJSON.content.MediaName,
         isPaused: ContentJSON.content.IsPaused,
         host: UserID,
@@ -721,29 +744,31 @@ const election = (ContentJSON, client, UserID) => {
         isEligibleForElection = isMemberBelongToRoom && !isMemberAMod && doesMemberHasPermission
     ;
 
-    if(isEligibleForElection) {
-        rooms[RoomID].mods.push(ContentJSON.content);
+    switch(true) {
+        case isEligibleForElection:
+            rooms[RoomID].mods.push(ContentJSON.content);
 
-        broadcastToRoom(RoomID, ContentJSON);
+            broadcastToRoom(RoomID, ContentJSON);
 
-        sendAdminMessage({
-            type: "userElection",
-            content: {
-                RoomID,
-                Target: ContentJSON.content
-            }
-        });
+            sendAdminMessage({
+                type: "userElection",
+                content: {
+                    RoomID,
+                    Target: ContentJSON.content
+                }
+            });
 
-        Logs.addEntry(RoomID, "election", ContentJSON.content);
-    }
-    else if(!doesMemberHasPermission) {
-        sendError(client, `Insufficient permission.`, UserID);
-    }
-    else if(isMemberAMod) {
-        sendError(client, `Member ${ContentJSON.content} is already a moderator.`, UserID);
-    }
-    else {
-        sendError(client, `Unknown member ${ContentJSON.content}: Member does not exist or does not belong to this room.`, UserID);
+            Logs.addEntry(RoomID, "election", ContentJSON.content);
+            break;
+        case !doesMemberHasPermission:
+            sendError(client, `Insufficient permission.`, UserID);
+            break;
+        case isMemberAMod:
+            sendError(client, `Member ${ContentJSON.content} is already a moderator.`, UserID);
+            break;
+        default:
+            sendError(client, `Unknown member ${ContentJSON.content}: Member does not exist or does not belong to this room.`, UserID);
+            break;
     }
 };
 
@@ -785,29 +810,31 @@ const demotion = (ContentJSON, client, UserID) => {
         isEligibleForDemotion = isMemberBelongToRoom && isMemberAMod && doesMemberHasPermission
     ;
 
-    if(isEligibleForDemotion) {
-        rooms[RoomID].mods = rooms[RoomID].mods.filter(member => member !== ContentJSON.content);
+    switch(true) {
+        case isEligibleForDemotion:
+            rooms[RoomID].mods = rooms[RoomID].mods.filter(member => member !== ContentJSON.content);
 
-        broadcastToRoom(RoomID, ContentJSON);
+            broadcastToRoom(RoomID, ContentJSON);
 
-        sendAdminMessage({
-            type: "userDemotion",
-            content: {
-                RoomID,
-                Target: ContentJSON.content
-            }
-        });
+            sendAdminMessage({
+                type: "userDemotion",
+                content: {
+                    RoomID,
+                    Target: ContentJSON.content
+                }
+            });
 
-        Logs.addEntry(RoomID, "demotion", ContentJSON.content);
-    }
-    else if(!doesMemberHasPermission) {
-        sendError(client, `Insufficient permission.`, UserID);
-    }
-    else if(!isMemberAMod) {
-        sendError(client, `Member ${ContentJSON.content} is not a moderator.`, UserID);
-    }
-    else {
-        sendError(client, `Unknown member ${ContentJSON.content}: Member does not exist or does not belong to this room.`, UserID);
+            Logs.addEntry(RoomID, "demotion", ContentJSON.content);
+            break;
+        case !doesMemberHasPermission:
+            sendError(client, `Insufficient permission.`, UserID);
+            break;
+        case !isMemberAMod:
+            sendError(client, `Member ${ContentJSON.content} is not a moderator.`, UserID);
+            break;
+        default:
+            sendError(client, `Unknown member ${ContentJSON.content}: Member does not exist or does not belong to this room.`, UserID);
+            break;
     }
 };
 

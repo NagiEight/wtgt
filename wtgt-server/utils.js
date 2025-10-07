@@ -83,9 +83,7 @@ const validateMessage = (message, sample) => {
  * @param {number} length 
  * @returns The password. Charset include alphanumeric characters and specials characters.
  */
-const generatePassword = (length = 16) => {
-    length = Math.max(16, length);
-    
+const generatePassword = (length = 16) => {    
     const 
         alpha = "abcdefghijklmnopqstuvwxyz",
         alphaUp = alpha.toUpperCase(),
