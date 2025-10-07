@@ -70,7 +70,7 @@ let
     try {
         file = await fs.open(`${propertiesPath}/config.json`, "w+");
         const content = await file.read({ encoding: "utf-8" });
-        config = JSON.stringify(content);
+        config = JSON.parse(content);
 
         if(!utils.validateMessage(config, defaultConfig)) {
             await file.write(defaultConfig);
@@ -79,7 +79,7 @@ let
     }
     catch(err) {
         console.error(`Error when reading file: ${err}`);
-        await file.write(defaultConfig);
+        await file.write(JSON.stringify(defaultConfig));
         config = defaultConfig;
     }
     finally {

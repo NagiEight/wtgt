@@ -53,9 +53,6 @@ const validateMessage = (message, sample) => {
     const typeMessage = getType(message);
     const typeSample = getType(sample);
 
-    if(typeMessage !== typeSample) 
-        return false;
-
     if(typeMessage === "array") {
         for(const item of message) {
             if(!validateMessage(item, sample[0])) 
