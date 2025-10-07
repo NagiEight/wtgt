@@ -137,7 +137,6 @@ wss.on("connection", (client, req) => {
         delete members[UserID];
     });
 
-
     client.on("message", (message) => {
         let ContentJSON;
         try {
@@ -425,19 +424,19 @@ const Logs = class {
             return;
         }
         
-        const logstring = Logs.toString();
-        
         let
             logID = crypto.randomUUID(),
             fileName = `${logID}.log`,
             filePath = path.join("logs", fileName)
         ;
-
+        
         while(files.includes(fileName)) {
             logID = crypto.randomUUID();
             fileName = `${logID}.log`;
         }
-    
+
+        const logstring = Logs.toString();
+        
         await fs.writeFile(filePath, logstring, "utf-8");
     };
 };
