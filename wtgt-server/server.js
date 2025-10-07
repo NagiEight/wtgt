@@ -310,9 +310,9 @@ const Logs = class {
         end: " ended their room session."
     };
     
-    static generateLogString = (logEntry, suffix = "") => {
-        return `{${logEntry.roomID}}[${logEntry.timestamp}] ${logEntry.entryTarget}${suffix}`;
-    };
+    static generateLogString = (logEntry, suffix = "") =>
+        `[${logEntry.timestamp}]${logEntry.roomID ?? `{${logEntry.roomID}}`} ${logEntry.entryTarget}${suffix}`;
+    
     
     /**
      * Add a new entry to the logs.
@@ -516,7 +516,7 @@ const host = (ContentJSON, client, UserID) => {
         sendError(client, `Invalid message format for ${ContentJSON.type}.`, UserID);
         return;
     }
-    
+
     const isInRoom = members[UserID].In !== "";
     if(isInRoom) {
         sendError(client, `Member ${UserID} is already belong to a room.`, UserID);

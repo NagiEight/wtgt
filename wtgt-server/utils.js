@@ -104,4 +104,7 @@ const generatePassword = (length = 16) => {
     return output;
 };
 
-module.exports = { generatePassword, validateMessage };
+module.exports = { 
+    generatePassword,
+    validateMessage 
+};
