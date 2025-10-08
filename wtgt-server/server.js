@@ -62,25 +62,20 @@ let
 
 (async () => {
     await fs.mkdir("server-properties", { recursive: true });
-    let file;
-    
+
     try {
-        file = await fs.open(`${propertiesPath}/config.json`, "w+");
-        const content = await file.read({ encoding: "utf-8" });
+        const content = await fs.readFile(`${propertiesPath}/config.json`, "utf-8");
         config = JSON.parse(content);
 
         if(!utils.validateMessage(config, defaultConfig)) {
-            await file.write(defaultConfig);
+            await fs.writeFile(`${propertiesPath}/config.json`, JSON.stringify(defaultConfig, null, 4), "utf-8");
             config = defaultConfig;
         }
     }
     catch(err) {
         console.error(`Error when reading file: ${err}`);
-        await file.write(JSON.stringify(defaultConfig));
+        await fs.writeFile(`${propertiesPath}/config.json`, JSON.stringify(defaultConfig, null, 4), "utf-8");
         config = defaultConfig;
-    }
-    finally {
-        await file.close();
     }
 
     if(config.regeneratePassword) {
@@ -114,11 +109,6 @@ wss.on("connection", (client, req) => {
         }
     });
     
-    client.send(JSON.stringify({
-        type: "info",
-        content: UserID
-    }));
-
     Logs.addEntry("", "connection", UserID);
 
     members[UserID] = {
@@ -411,6 +401,10 @@ const Logs = class {
      * Create a log file at logs.
      */
     static createLog = async () => {
+        const logstring = Logs.toString();
+        if(logstring === "")
+            return;
+
         await fs.mkdir("logs", { recursive: true });
         let files;
 
@@ -433,7 +427,6 @@ const Logs = class {
             fileName = `${logID}.log`;
         }
 
-        const logstring = Logs.toString();
         
         await fs.writeFile(filePath, logstring, "utf-8");
     };
@@ -441,11 +434,22 @@ const Logs = class {
 
 const shutdown = () => {
     console.log("Shutting down gracefully...");
+
+    wss.clients.forEach(client => {
+        try {
+            client.terminate();
+        }
+        catch(err) {
+            console.error("Error closing client:", e);
+        }
+    });
+
     server.close(async () => {
         await Logs.createLog();
         console.log("All connections closed, exiting.");
         process.exit(0);
     });
+
 }
 
 /**
@@ -554,7 +558,7 @@ const host = (ContentJSON, client, UserID) => {
         }
     });
 
-    Logs.addEntry(roomID, "host", UserID);
+    Logs.addEntry(RoomID, "host", UserID);
 };
 
 /**
