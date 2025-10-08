@@ -52,7 +52,8 @@ const
     propertiesPath = "./server-properties",
     defaultConfig = {
         adminPasswordLength: 16,
-        maxAdminLoginAttempts: 5
+        maxAdminLoginAttempts: 5,
+        regeneratePassword: true
     }
 ;
     
@@ -64,7 +65,7 @@ let
 ;
 
 (async () => {
-    
+    await fs.mkdir("server-properties", { recursive: true });
     let file;
     
     try {
@@ -86,8 +87,10 @@ let
         await file.close();
     }
 
-    credentials = utils.generatePassword(config.adminPasswordLength);
-    await fs.writeFile(`${propertiesPath}/password.txt`, credentials, "utf-8");
+    if(config.regeneratePassword) {
+        credentials = utils.generatePassword(config.adminPasswordLength);
+        await fs.writeFile(`${propertiesPath}/password.txt`, credentials, "utf-8");
+    }
 })();
 
 wss.on("connection", (client, req) => {
@@ -317,9 +320,8 @@ const Logs = class {
         end: " ended their room session."
     };
     
-    static generateLogString = (logEntry, suffix = "") =>
+    static generateLogString = (logEntry, suffix = "") => 
         `[${logEntry.timestamp}]${logEntry.roomID ?? `{${logEntry.roomID}}`} ${logEntry.entryTarget}${suffix}`;
-    
     
     /**
      * Add a new entry to the logs.
