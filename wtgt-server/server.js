@@ -1,6 +1,5 @@
 //Imports
-const
-    http = require("http"),
+const http = require("http"),
     ws = require("ws"),
     crypto = require("crypto"),
     fs = require("fs/promises"),
@@ -9,8 +8,7 @@ const
 ;
 
 //Constants
-const
-    PORT = 3000,
+const PORT = 3000,
     /**
      *  ```js
      *  roomID: {
@@ -54,8 +52,7 @@ const
 ;
     
 //runtime variables
-let
-    credentials = "",
+let credentials = "",
     adminID = "",
     config = {}
 ;
@@ -85,14 +82,14 @@ let
 })();
 
 wss.on("connection", (client, req) => {
-    const
-        url = new URL(req.url, `ws://${req.headers.host}`),
+    const url = new URL(req.url, `ws://${req.headers.host}`),
         userProfile = {
             UserName: url.searchParams.get("UserName"),
             Avt: url.searchParams.get("Avt")
-        }
+        },
+        UserID = generateUUID("User")
     ;
-    const UserID = generateUUID("User");
+
     let adminLoginAttempts = 0;
 
     sendAdminMessage({
@@ -411,8 +408,7 @@ const Logs = class {
             return;
         }
         
-        let
-            logID = crypto.randomUUID(),
+        let logID = crypto.randomUUID(),
             fileName = `${logID}.log`,
             filePath = path.join("logs", fileName)
         ;
@@ -451,17 +447,15 @@ const shutdown = () => {
  * Returns the current time as a formatted string.
  */
 const getCurrentTime = () => {
-    const
-        now = new Date(),
+    const now = new Date(),
         hours = String(now.getHours()).padStart(2, "0"),
         minutes = String(now.getMinutes()).padStart(2, "0"),
         seconds = String(now.getSeconds()).padStart(2, "0"),
         day = String(now.getDate()).padStart(2, "0"),
         month = String(now.getMonth() + 1).padStart(2, "0"),
-        year = now.getFullYear()
+        year = now.getFullYear(),
+        formatted = `${hours}:${minutes}:${seconds} ${day}/${month}/${year}`
     ;
-
-    const formatted = `${hours}:${minutes}:${seconds} ${day}/${month}/${year}`;
 
     return formatted;
 };
@@ -630,8 +624,9 @@ const join = (ContentJSON, client, UserID) => {
     rooms[ContentJSON.content].members.push(UserID);
     members[UserID].In = ContentJSON.content;
 
-    const currentRoom = rooms[ContentJSON.content];
-    const membersObj = {};
+    const currentRoom = rooms[ContentJSON.content],
+        membersObj = {}
+    ;
 
     for(const memberID of currentRoom.members) {
         membersObj[memberID] = {
@@ -696,8 +691,7 @@ const sendMessage = (ContentJSON, client, UserID) => {
         return;
     }
 
-    const 
-        RoomID = members[UserID].In,
+    const RoomID = members[UserID].In,
         isInRoom = RoomID !== ""
     ;
 
@@ -706,8 +700,7 @@ const sendMessage = (ContentJSON, client, UserID) => {
         return;
     }
 
-    const 
-        MessageID = generateUUID("Message", {RoomID}),
+    const MessageID = generateUUID("Message", {RoomID}),
         MessageObject = {
             Sender: UserID,
             Text: ContentJSON.content,
@@ -751,8 +744,7 @@ const election = (ContentJSON, client, UserID) => {
         return;
     }
 
-    const 
-        RoomID = members[UserID].In,
+    const RoomID = members[UserID].In,
         isInRoom = RoomID !== ""
     ;
     if(!isInRoom) {
@@ -760,8 +752,7 @@ const election = (ContentJSON, client, UserID) => {
         return;
     }
 
-    const 
-        isMemberBelongToRoom = rooms[RoomID].members.includes(ContentJSON.content),
+    const isMemberBelongToRoom = rooms[RoomID].members.includes(ContentJSON.content),
         isMemberAMod = rooms[RoomID].mods.includes(ContentJSON.content),
         doesMemberHasPermission = rooms[RoomID].host == UserID,
         isEligibleForElection = isMemberBelongToRoom && !isMemberAMod && doesMemberHasPermission
@@ -817,8 +808,7 @@ const demotion = (ContentJSON, client, UserID) => {
         return;
     }
 
-    const 
-        RoomID = members[UserID].In,
+    const RoomID = members[UserID].In,
         isInRoom = RoomID !== ""
     ;
     if(!isInRoom) {
@@ -826,8 +816,7 @@ const demotion = (ContentJSON, client, UserID) => {
         return;
     }
         
-    const
-        isMemberBelongToRoom = rooms[RoomID].members.includes(ContentJSON.content),
+    const isMemberBelongToRoom = rooms[RoomID].members.includes(ContentJSON.content),
         isMemberAMod = rooms[RoomID].mods.includes(ContentJSON.content),
         doesMemberHasPermission = rooms[RoomID].host == UserID,
         isEligibleForDemotion = isMemberBelongToRoom && isMemberAMod && doesMemberHasPermission
@@ -1016,8 +1005,7 @@ const sendAdminMessage = (JSONContent) => {
  * @param {Object} extras 
  */
 const generateUUID = (type, extras = {}) => {
-    let 
-        UUID = crypto.randomUUID(),
+    let UUID = crypto.randomUUID(),
         group
     ;
 
