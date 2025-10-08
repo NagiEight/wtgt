@@ -29,9 +29,7 @@ const
      *  }
      *  ```
      */
-    rooms = {
-
-    },
+    rooms = {},
     /**
      *  ```js
      *  MemberID: {
@@ -42,9 +40,7 @@ const
      *  }
      *  ```
      */
-    members = {
-
-    },
+    members = {},
     server = http.createServer((req, res) => {
         
     }),
@@ -61,7 +57,7 @@ const
 let
     credentials = "",
     adminID = "",
-    config
+    config = {}
 ;
 
 (async () => {
