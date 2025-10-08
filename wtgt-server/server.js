@@ -61,23 +61,23 @@ let credentials = "",
     await fs.mkdir("server-properties", { recursive: true });
 
     try {
-        const content = await fs.readFile(`${propertiesPath}/config.json`, "utf-8");
+        const content = await fs.readFile(path.join(propertiesPath, "config.json"), "utf-8");
         config = JSON.parse(content);
 
         if(!utils.validateMessage(config, defaultConfig)) {
-            await fs.writeFile(`${propertiesPath}/config.json`, JSON.stringify(defaultConfig, null, 4), "utf-8");
+            await fs.writeFile(path.join(propertiesPath, "config.json"), JSON.stringify(defaultConfig, null, 4), "utf-8");
             config = defaultConfig;
         }
     }
     catch(err) {
         console.error(`Error when reading file: ${err}`);
-        await fs.writeFile(`${propertiesPath}/config.json`, JSON.stringify(defaultConfig, null, 4), "utf-8");
+        await fs.writeFile(path.join(propertiesPath, "config.json"), JSON.stringify(defaultConfig, null, 4), "utf-8");
         config = defaultConfig;
     }
 
     if(config.regeneratePassword) {
         credentials = utils.generatePassword(config.adminPasswordLength);
-        await fs.writeFile(`${propertiesPath}/password.txt`, credentials, "utf-8");
+        await fs.writeFile(path.join(propertiesPath, "password.txt"), credentials, "utf-8");
     }
 })();
 
@@ -298,8 +298,8 @@ const Logs = class {
         end: " ended their room session."
     };
     
-    static generateLogString = (logEntry, suffix) => 
-        `[${logEntry.timestamp}]${logEntry.roomID === "" ? "" : `{${logEntry.roomID}}`} ${logEntry.entryTarget}${suffix}`;
+    static generateLogString = (logEntry, ...suffixes) => 
+        `[${logEntry.timestamp}]${logEntry.roomID === "" ? "" : `{${logEntry.roomID}}`} ${logEntry.entryTarget}${suffixes.join("")}`;
     
     /**
      * Add a new entry to the logs.
@@ -341,11 +341,11 @@ const Logs = class {
         let LogString;
         switch(logEntry.event) {
             case "message":
-                LogString = Logs.generateLogString(logEntry, `: ${logEntry.text}`);
+                LogString = Logs.generateLogString(logEntry, ": ", logEntry.text, "\n");
                 break;
                 
             case "sync":
-                LogString = Logs.generateLogString(logEntry, `: Skipped to ${logEntry.to}.`);
+                LogString = Logs.generateLogString(logEntry, ": Skipped to ", logEntry.to, ".\n");
                 break;
                 
             case "error":
@@ -353,7 +353,7 @@ const Logs = class {
                 break;
 
             default:
-                LogString = Logs.generateLogString(logEntry, Logs.formatList[logEntry.event]);
+                LogString = Logs.generateLogString(logEntry, Logs.formatList[logEntry.event], "\n");
                 break;
         }
         console.log(LogString);
@@ -366,22 +366,22 @@ const Logs = class {
     static toString = () => {
         let output = "";
 
-        for(const log of Logs.logs) {
-            switch(log.event) {
+        for(const logEntry of Logs.logs) {
+            switch(logEntry.event) {
                 case "message":
-                    output += Logs.generateLogString(log, `: ${log.text}\n`);
+                    output += Logs.generateLogString(logEntry, ": ", logEntry.text, "\n");
                     break;
                     
                 case "sync":
-                    output += Logs.generateLogString(log, `: Skipped to ${log.to}.\n`);
+                    output += Logs.generateLogString(logEntry, ": Skipped to ", logEntry.to, ".\n");
                     break;
 
                 case "error":
-                    output += Logs.generateLogString(log, `: Error: ${log.message}\n`);
+                    output += Logs.generateLogString(logEntry, ": Error: ", logEntry.message, "\n");
                     break;
 
                 default:
-                    output += Logs.generateLogString(log, `${Logs.formatList[log.event]}\n`);
+                    output += Logs.generateLogString(logEntry, Logs.formatList[logEntry.event], "\n");
                     break;
             }
         }
