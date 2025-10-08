@@ -53,7 +53,7 @@ const
     }
 ;
     
-    //runtime variables
+//runtime variables
 let
     credentials = "",
     adminID = "",
@@ -92,12 +92,7 @@ wss.on("connection", (client, req) => {
             Avt: url.searchParams.get("Avt")
         }
     ;
-    let UserID = crypto.randomUUID();
-        
-    const users = Object.keys(members);
-    while(users.includes(UserID))
-        UserID = crypto.randomUUID();
-
+    const UserID = generateUUID("User");
     let adminLoginAttempts = 0;
 
     sendAdminMessage({
@@ -300,14 +295,14 @@ const Logs = class {
         election: " elected to modertor.",
         demotion: " demoted by the host.",
         host: " hosted a new room.",
-        join: " joined.",
+        join: " joined a room.",
         leave: " left.",
         pause: " paused.",
         end: " ended their room session."
     };
     
-    static generateLogString = (logEntry, suffix = "") => 
-        `[${logEntry.timestamp}]${logEntry.roomID ?? `{${logEntry.roomID}}`} ${logEntry.entryTarget}${suffix}`;
+    static generateLogString = (logEntry, suffix) => 
+        `[${logEntry.timestamp}]${logEntry.roomID === "" ? "" : `{${logEntry.roomID}}`} ${logEntry.entryTarget}${suffix}`;
     
     /**
      * Add a new entry to the logs.
@@ -389,7 +384,7 @@ const Logs = class {
                     break;
 
                 default:
-                    output += Logs.generateLogString(log, Logs.formatList[log.event], "\n");
+                    output += Logs.generateLogString(log, `${Logs.formatList[log.event]}\n`);
                     break;
             }
         }
@@ -500,22 +495,28 @@ const sendError = (client, message, UserID) => {
 
 /**
  *  ```json
- *  { //Note: Server will not return anything in this type of message.  
- *      "type": "host",  
- *      "content": {  
- *          "MediaName": "helloworld.mp4",  
- *          "IsPaused": true  
- *      }  
- *  }  
- *  
- *  //server-to-admin:  
- *  {  
- *      "type": "userHost",  
- *      "content": {  
- *          "RoomID": "roomID"
- *          "MediaName": "helloworld.mp4",  
- *          "IsPaused": false,  
- *          "Host": "userID"  
+ *  //client-to-server:
+ *  {
+ *      "type": "host",
+ *      "content": {
+ *          "MediaName": "helloworld.mp4",
+ *          "IsPaused": true
+ *      }
+ *  }
+ *  //server-to-client:
+ *  {
+ *      "type": "info",
+ *      "content": "roomID"
+ *  } 
+ * 
+ *  //server-to-admin:
+ *  {
+ *      "type": "userHost",
+ *      "content": {
+ *          "RoomID": "roomID",
+ *          "MediaName": "helloworld.mp4",
+ *          "IsPaused": false,
+ *          "Host": "userID"
  *      }  
  *  }
  *  ```
@@ -532,13 +533,9 @@ const host = (ContentJSON, client, UserID) => {
         return;
     }
 
-    let RoomID = crypto.randomUUID();
-    const rooms = Object.keys(rooms);
-
-    while(rooms.includes(RoomID))
-        RoomID = crypto.randomUUID();
+    let RoomID = generateUUID("Room");
     
-    members[RoomID].In = UserID;
+    members[UserID].In = RoomID;
     rooms[RoomID] = {
         currentMedia: ContentJSON.content.MediaName,
         isPaused: ContentJSON.content.IsPaused,
@@ -548,6 +545,10 @@ const host = (ContentJSON, client, UserID) => {
         messages: {}
     }
 
+    client.send(JSON.stringify({
+        type: "info",
+        content: RoomID
+    }));
     sendAdminMessage({
         type: "userHost",
         content: {
@@ -640,8 +641,8 @@ const join = (ContentJSON, client, UserID) => {
     }
 
     client.send(JSON.stringify({ type: "init", content: {
-        CurrentMedia: currentRoom.MediaName,
-        IsPaused: currentRoom.IsPaused,
+        CurrentMedia: currentRoom.currentMedia,
+        IsPaused: currentRoom.isPaused,
         Mods: currentRoom.mods,
         Members: membersObj,
         Messages: currentRoom.messages
@@ -705,17 +706,14 @@ const sendMessage = (ContentJSON, client, UserID) => {
         return;
     }
 
-    let MessageID = crypto.randomUUID();
-    const messages = Object.keys(rooms[RoomID].messages);
-
-    while(messages.includes(MessageID))
-        MessageID = crypto.randomUUID();
-
-    const MessageObject = {
-        Sender: UserID,
-        Text: ContentJSON.content,
-        Timestamp: getCurrentTime()
-    };
+    const 
+        MessageID = generateUUID("Message", {RoomID}),
+        MessageObject = {
+            Sender: UserID,
+            Text: ContentJSON.content,
+            Timestamp: getCurrentTime()
+        }
+    ;
         
     rooms[RoomID].messages[MessageID] = MessageObject;
 
@@ -978,19 +976,29 @@ const sync = (ContentJSON, client, UserID) => {
         return;
     }
 
-    broadcastToRoom(RoomID, ContentJSON);
+    broadcastToRoom(RoomID, ContentJSON, UserID);
 
     Logs.addEntry(RoomID, "sync", UserID, { to: ContentJSON.content });
 };
 
 const adminLogin = (UserID, adminClient) => {
     adminID = UserID;
+
+    const membersObj = {};
+
+    for(const memberID of Object.keys(members)) {
+        membersObj[memberID] = {
+            UserName: members[memberID].UserName,
+            Avt: members[memberID].Avt
+        };
+    }
+
     adminClient.send(JSON.stringify({
         type: "adminInit", 
         content: {
             Logs: Logs.toString(),
             Rooms: rooms,
-            Members: members
+            Members: membersObj
         }
     }));
 };
@@ -1002,9 +1010,41 @@ const sendAdminMessage = (JSONContent) => {
     members[adminID].Socket.send(JSON.stringify(JSONContent));
 };
 
-// Log creation and shutdown handling
-server.on("close", Logs.createLog);
+/**
+ * 
+ * @param {"Room" | "Message" | "User"} type 
+ * @param {Object} extras 
+ */
+const generateUUID = (type, extras = {}) => {
+    let 
+        UUID = crypto.randomUUID(),
+        group
+    ;
 
+    switch(type) {
+        case "Message":
+            group = Object.keys(rooms[extras.RoomID].messages);
+            break;
+
+        case "Room":
+            group = Object.keys(rooms);
+            break;
+
+        case "User":
+            group = Object.keys(members);
+            break;
+
+        default:
+            throw new TypeError(`${type} does not exist as an valid group type.`);
+    }
+
+    while(group.includes(UUID))
+        UUID = crypto.randomUUID();
+
+    return UUID;
+};
+
+// Log creation and shutdown handling
 server.on("error", (err) => {
     console.error("Server error:", err);
     shutdown();
