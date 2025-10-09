@@ -60,25 +60,31 @@ let credentials = "",
 
 (async () => {
     await fs.mkdir("server-properties", { recursive: true });
+    const configPath = path.join(propertiesPath, "config.json");
+    const passwordPath = path.join(propertiesPath, "password.txt");
+    const encoding = "utf-8";
 
     try {
-        const content = await fs.readFile(path.join(propertiesPath, "config.json"), "utf-8");
+        const content = await fs.readFile(configPath, "utf-8");
         config = JSON.parse(content);
 
         if(!utils.validateMessage(config, defaultConfig)) {
-            await fs.writeFile(path.join(propertiesPath, "config.json"), JSON.stringify(defaultConfig, null, 4), "utf-8");
+            await fs.writeFile(configPath, JSON.stringify(defaultConfig, null, 4), "utf-8");
             config = defaultConfig;
         }
     }
     catch(err) {
         console.error(`Error when reading file: ${err}`);
-        await fs.writeFile(path.join(propertiesPath, "config.json"), JSON.stringify(defaultConfig, null, 4), "utf-8");
+        await fs.writeFile(configPath, JSON.stringify(defaultConfig, null, 4), "utf-8");
         config = defaultConfig;
     }
 
     if(config.regeneratePassword) {
         credentials = utils.generatePassword(config.adminPasswordLength);
-        await fs.writeFile(path.join(propertiesPath, "password.txt"), credentials, "utf-8");
+        await fs.writeFile(passwordPath, credentials, { encoding });
+    }
+    else {
+        credentials = await fs.readFile(passwordPath, { encoding });
     }
 })();
 
