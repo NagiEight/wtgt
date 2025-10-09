@@ -14,6 +14,7 @@ const PORT = 3000,
      *  roomID: {
      *      currentMedia: "medianame.mp4",
      *      host: "hostID"
+     *      type: "private"
      *      mods: [],
      *      members: [memberIDs],
      *      isPaused: false,
@@ -494,6 +495,7 @@ const sendError = (client, message, UserID) => {
  *      "type": "host",
  *      "content": {
  *          "MediaName": "helloworld.mp4",
+ *          "RoomType": "private"
  *          "IsPaused": true
  *      }
  *  }
@@ -508,6 +510,7 @@ const sendError = (client, message, UserID) => {
  *      "type": "userHost",
  *      "content": {
  *          "RoomID": "roomID",
+ *          "RoomType": "private",
  *          "MediaName": "helloworld.mp4",
  *          "IsPaused": false,
  *          "Host": "userID"
@@ -516,7 +519,7 @@ const sendError = (client, message, UserID) => {
  *  ```
  */
 const host = (ContentJSON, client, UserID) => {
-    if(!utils.validateMessage(ContentJSON, { type: "test", content: { MediaName: "test", IsPaused: true }})) {
+    if(!utils.validateMessage(ContentJSON, { type: "test", content: { MediaName: "test", RoomType: "test", IsPaused: true }})) {
         sendError(client, `Invalid message format for ${ContentJSON.type}.`, UserID);
         return;
     }
@@ -527,6 +530,18 @@ const host = (ContentJSON, client, UserID) => {
         return;
     }
 
+    const allowedRoomTypes = [
+        "private",
+        "public"
+    ];
+
+    const RoomType = ContentJSON.content.RoomType;
+
+    if(!allowedRoomTypes.includes(RoomType)) {
+        sendError(client, `Unknown room type: ${RoomType}`, UserID);
+        return;
+    }
+
     let RoomID = generateUUID("Room");
     
     members[UserID].In = RoomID;
@@ -534,6 +549,7 @@ const host = (ContentJSON, client, UserID) => {
         currentMedia: ContentJSON.content.MediaName,
         isPaused: ContentJSON.content.IsPaused,
         host: UserID,
+        type: RoomType,
         mods: [],
         members: [UserID],
         messages: {}
@@ -614,17 +630,19 @@ const join = (ContentJSON, client, UserID) => {
         sendError(client, `Unknown room ${ContentJSON.content}.`, UserID);
         return;
     }
-    const isInRoom = members[UserID].In !== "";
+    const isInRoom = members[UserID].In !== "",
+        RoomID = ContentJSON.content
+    ;
 
     if(isInRoom) {
         sendError(client, `Member ${UserID} is already belong to a room.`, UserID);
         return;
     }
 
-    rooms[ContentJSON.content].members.push(UserID);
-    members[UserID].In = ContentJSON.content;
+    rooms[RoomID].members.push(UserID);
+    members[UserID].In = RoomID;
 
-    const currentRoom = rooms[ContentJSON.content],
+    const currentRoom = rooms[RoomID],
         membersObj = {}
     ;
 
@@ -635,13 +653,18 @@ const join = (ContentJSON, client, UserID) => {
         };
     }
 
-    client.send(JSON.stringify({ type: "init", content: {
+    const toSend = {
         CurrentMedia: currentRoom.currentMedia,
         IsPaused: currentRoom.isPaused,
         Mods: currentRoom.mods,
         Members: membersObj,
         Messages: currentRoom.messages
-    }}));
+    };
+
+    if(rooms[RoomID].type === "private") 
+        toSend.RoomID = RoomID;
+
+    client.send(JSON.stringify({ type: "init", content: toSend}));
 
     broadcastToRoom(members[UserID].In, {
         type: "join",
@@ -935,7 +958,7 @@ const pause = (ContentJSON, client, UserID) => {
     }
     
     const RoomID = members[UserID].In;
-    if(UserID !== rooms[RoomID].host) {
+    if(UserID !== rooms[RoomID].host && rooms[RoomID].type === "public") {
         sendError(client, "Insufficient permission.", UserID);
         return;
     }
@@ -960,7 +983,7 @@ const sync = (ContentJSON, client, UserID) => {
     }
 
     const RoomID = members[UserID].In;
-    if(UserID !== rooms[RoomID].host) {
+    if(UserID !== rooms[RoomID].host && rooms[RoomID].type === "public") {
         sendError(client, "Insufficient permission.", UserID);
         return;
     }
