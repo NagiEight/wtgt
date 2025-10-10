@@ -83,9 +83,7 @@ let credentials = "",
         credentials = utils.generatePassword(config.adminPasswordLength);
         await fs.writeFile(passwordPath, credentials, { encoding });
     }
-    else {
-        credentials = await fs.readFile(passwordPath, { encoding });
-    }
+    else credentials = await fs.readFile(passwordPath, { encoding });
 })();
 
 wss.on("connection", (client, req) => {
@@ -108,7 +106,7 @@ wss.on("connection", (client, req) => {
         }
     });
     
-    Logs.addEntry("", "connection", UserID);
+    utils.Logs.addEntry("", "connection", UserID);
 
     members[UserID] = {
         UserName: userProfile.UserName,
@@ -118,10 +116,10 @@ wss.on("connection", (client, req) => {
     };
 
     client.on("close", () => {
-        if(UserID === adminID) {
+        if(UserID === adminID) 
             adminID = "";
-        }
-        Logs.addEntry("", "disconnection", UserID);
+        
+        utils.Logs.addEntry("", "disconnection", UserID);
         delete members[UserID];
     });
 
@@ -186,7 +184,7 @@ wss.on("connection", (client, req) => {
              *  {
              *      "type": "adminInit", 
              *      "content": {
-             *          "Logs": "ServerLogs",
+             *          "utils.Logs": "Serverutils.Logs",
              *          "Rooms": {
              *              "roomID": {
              *                  "currentMedia": "medianame.mp4",
@@ -213,7 +211,7 @@ wss.on("connection", (client, req) => {
              *  }
              *  {
              *      "type": "log",
-             *      "content": "logstring"
+             *      "content": "utils.Logstring"
              *  }
              */
             case "adminLogin":
@@ -269,10 +267,12 @@ wss.on("connection", (client, req) => {
                     sendError(client, `Invalid message format for ${ContentJSON.type}.`, UserID);
                     break;
                 }
+
                 if(UserID !== adminID) {
                     sendError(client, "Insufficient permission.", UserID);
                     break;
                 }
+                
                 server.close();
                 break;
 
@@ -282,153 +282,6 @@ wss.on("connection", (client, req) => {
         }
     });
 });
-
-//classes
-const Logs = class {
-    /**
-     * Server's log. Use addEntry instead of changing this directly.
-     */
-    static logs = [];
-
-    /**
-     * A list of predefined suffix for most logging event types. Don't change this, please.
-     */
-    static formatList = {
-        connection: " connected.",
-        disconnection: " disconnected.",
-        election: " elected to modertor.",
-        demotion: " demoted by the host.",
-        host: " hosted a new room.",
-        join: " joined a room.",
-        leave: " left.",
-        pause: " paused.",
-        end: " ended their room session."
-    };
-    
-    static generateLogString = (logEntry, ...suffixes) => 
-        `[${logEntry.timestamp}]${logEntry.roomID === "" ? "" : `{${logEntry.roomID}}`} ${logEntry.entryTarget}${suffixes.join("")}`;
-    
-    /**
-     * Add a new entry to the logs.
-     * 
-     * @param {string} roomID 
-     * @param {"connection" | "disconnection" | "election" | "demotion" | "host" | "message" | "join" | "leave" | "pause" | "sync" | "end" | "error"} entryType 
-     * @param {string} entryTarget 
-     * @param {Object} extras 
-     */
-    static addEntry = (roomID, entryType, entryTarget, extras = {}) => {
-        const allowedEntryType = [
-            "connection",
-            "disconnection",
-            "election",
-            "demotion",
-            "host",
-            "message",
-            "join",
-            "leave",
-            "pause",
-            "sync",
-            "end",
-            "error"
-        ];
-
-        if(!allowedEntryType.includes(entryType)) {
-            throw new TypeError(`Unknown entryType "${entryType}", please try again.`);
-        }
-
-        const logEntry = {
-            event: entryType,
-            entryTarget,
-            roomID,
-            ...extras,
-            timestamp: getCurrentTime()
-        };
-        Logs.logs.push(logEntry);
-
-        let LogString;
-        switch(logEntry.event) {
-            case "message":
-                LogString = Logs.generateLogString(logEntry, ": ", logEntry.text, "\n");
-                break;
-                
-            case "sync":
-                LogString = Logs.generateLogString(logEntry, ": Skipped to ", logEntry.to, ".\n");
-                break;
-                
-            case "error":
-                LogString = Logs.generateLogString(logEntry, `: Error: ${logEntry.message}`);
-                break;
-
-            default:
-                LogString = Logs.generateLogString(logEntry, Logs.formatList[logEntry.event], "\n");
-                break;
-        }
-        console.log(LogString);
-        sendAdminMessage({
-            type: "log",
-            content: LogString
-        });
-    }
-
-    static toString = () => {
-        let output = "";
-
-        for(const logEntry of Logs.logs) {
-            switch(logEntry.event) {
-                case "message":
-                    output += Logs.generateLogString(logEntry, ": ", logEntry.text, "\n");
-                    break;
-                    
-                case "sync":
-                    output += Logs.generateLogString(logEntry, ": Skipped to ", logEntry.to, ".\n");
-                    break;
-
-                case "error":
-                    output += Logs.generateLogString(logEntry, ": Error: ", logEntry.message, "\n");
-                    break;
-
-                default:
-                    output += Logs.generateLogString(logEntry, Logs.formatList[logEntry.event], "\n");
-                    break;
-            }
-        }
-
-        return output.trim();
-    }
-
-    /**
-     * Create a log file at logs.
-     */
-    static createLog = async () => {
-        const logstring = Logs.toString();
-        if(logstring === "")
-            return;
-
-        await fs.mkdir("logs", { recursive: true });
-        let files;
-
-        try {
-            files = await fs.readdir("./logs");
-        }
-        catch(err) {
-            console.error("Error reading folder:", err);
-            return;
-        }
-        
-        let logID = crypto.randomUUID(),
-            fileName = `${logID}.log`,
-            filePath = path.join("logs", fileName)
-        ;
-        
-        while(files.includes(fileName)) {
-            logID = crypto.randomUUID();
-            fileName = `${logID}.log`;
-        }
-
-        
-        await fs.writeFile(filePath, logstring, "utf-8");
-    };
-};
 
 const shutdown = () => {
     console.log("Shutting down gracefully...");
@@ -443,45 +296,25 @@ const shutdown = () => {
     });
 
     server.close(async () => {
-        await Logs.createLog();
+        await utils.Logs.createLog();
         console.log("All connections closed, exiting.");
         process.exit(0);
     });
 
 }
 
-/**
- * Returns the current time as a formatted string.
- */
-const getCurrentTime = () => {
-    const now = new Date(),
-        hours = String(now.getHours()).padStart(2, "0"),
-        minutes = String(now.getMinutes()).padStart(2, "0"),
-        seconds = String(now.getSeconds()).padStart(2, "0"),
-        day = String(now.getDate()).padStart(2, "0"),
-        month = String(now.getMonth() + 1).padStart(2, "0"),
-        year = now.getFullYear(),
-        formatted = `${hours}:${minutes}:${seconds} ${day}/${month}/${year}`
-    ;
-
-    return formatted;
-};
-
 const broadcastToRoom = (RoomID, message, except = null) => {
     if(!rooms[RoomID])
         return;
     
     for(const memberID of rooms[RoomID].members) {
-        if(memberID === except) {
+        if(memberID === except) 
             continue;
-        }
 
         const member = members[memberID];
-        if(member && member.Socket) {
-            if(member.Socket.readyState === ws.OPEN) {
+        if(member && member.Socket)
+            if(member.Socket.readyState === ws.OPEN)
                 member.Socket.send(JSON.stringify(message));
-            }
-        }
     }
 };
 
@@ -491,7 +324,7 @@ const sendError = (client, message, UserID) => {
         content: message
     }));
 
-    Logs.addEntry("", "error", UserID, { message })
+    utils.Logs.addEntry("", "error", UserID, { message })
 };
 
 /**
@@ -565,6 +398,7 @@ const host = (ContentJSON, client, UserID) => {
         type: "info",
         content: RoomID
     }));
+
     sendAdminMessage({
         type: "userHost",
         content: {
@@ -575,7 +409,7 @@ const host = (ContentJSON, client, UserID) => {
         }
     });
 
-    Logs.addEntry(RoomID, "host", UserID);
+    utils.Logs.addEntry(RoomID, "host", UserID);
 };
 
 /**
@@ -652,12 +486,11 @@ const join = (ContentJSON, client, UserID) => {
         membersObj = {}
     ;
 
-    for(const memberID of currentRoom.members) {
+    for(const memberID of currentRoom.members)
         membersObj[memberID] = {
             UserName: members[memberID].UserName,
             Avt: members[memberID].Avt
         };
-    }
 
     const toSend = {
         CurrentMedia: currentRoom.currentMedia,
@@ -689,7 +522,7 @@ const join = (ContentJSON, client, UserID) => {
         }
     });
 
-    Logs.addEntry(members[UserID].In, "join", UserID);
+    utils.Logs.addEntry(members[UserID].In, "join", UserID);
 };
 
 /** 
@@ -733,7 +566,7 @@ const sendMessage = (ContentJSON, client, UserID) => {
         MessageObject = {
             Sender: UserID,
             Text: ContentJSON.content,
-            Timestamp: getCurrentTime()
+            Timestamp: utils.getCurrentTime()
         }
     ;
         
@@ -745,9 +578,9 @@ const sendMessage = (ContentJSON, client, UserID) => {
             MessageID,
             MessageObject
         }
-    });
+    }, UserID);
 
-    Logs.addEntry(RoomID, "message", UserID, { text: ContentJSON.content });
+    utils.Logs.addEntry(RoomID, "message", UserID, { text: ContentJSON.content });
 };
 
 /**
@@ -801,7 +634,7 @@ const election = (ContentJSON, client, UserID) => {
                 }
             });
 
-            Logs.addEntry(RoomID, "election", ContentJSON.content);
+            utils.Logs.addEntry(RoomID, "election", ContentJSON.content);
             break;
         case !doesMemberHasPermission:
             sendError(client, `Insufficient permission.`, UserID);
@@ -865,7 +698,7 @@ const demotion = (ContentJSON, client, UserID) => {
                 }
             });
 
-            Logs.addEntry(RoomID, "demotion", ContentJSON.content);
+            utils.Logs.addEntry(RoomID, "demotion", ContentJSON.content);
             break;
         case !doesMemberHasPermission:
             sendError(client, `Insufficient permission.`, UserID);
@@ -930,7 +763,7 @@ const leave = (client, UserID) => {
             content: RoomID
         });
 
-        Logs.addEntry(RoomID, "end", UserID);
+        utils.Logs.addEntry(RoomID, "end", UserID);
     }
     else {
         rooms[RoomID].members = rooms[RoomID].members.filter(member => member !== UserID);
@@ -945,7 +778,7 @@ const leave = (client, UserID) => {
             }
         });
 
-        Logs.addEntry(RoomID, "leave", UserID);
+        utils.Logs.addEntry(RoomID, "leave", UserID);
     }
 };
 
@@ -968,10 +801,11 @@ const pause = (ContentJSON, client, UserID) => {
         sendError(client, "Insufficient permission.", UserID);
         return;
     }
+
     rooms[RoomID].isPaused = ContentJSON.content;
     broadcastToRoom(RoomID, ContentJSON);
 
-    Logs.addEntry(RoomID, "pause", UserID);
+    utils.Logs.addEntry(RoomID, "pause", UserID);
 };
 
 /**
@@ -996,7 +830,7 @@ const sync = (ContentJSON, client, UserID) => {
 
     broadcastToRoom(RoomID, ContentJSON, UserID);
 
-    Logs.addEntry(RoomID, "sync", UserID, { to: ContentJSON.content });
+    utils.Logs.addEntry(RoomID, "sync", UserID, { to: ContentJSON.content });
 };
 
 const adminLogin = (UserID, adminClient) => {
@@ -1004,17 +838,16 @@ const adminLogin = (UserID, adminClient) => {
 
     const membersObj = {};
 
-    for(const memberID of Object.keys(members)) {
+    for(const memberID of Object.keys(members))
         membersObj[memberID] = {
             UserName: members[memberID].UserName,
             Avt: members[memberID].Avt
         };
-    }
 
     adminClient.send(JSON.stringify({
         type: "adminInit", 
         content: {
-            Logs: Logs.toString(),
+            Logs: utils.Logs.toString(),
             Rooms: rooms,
             Members: membersObj
         }
@@ -1031,12 +864,10 @@ const sendAdminMessage = (JSONContent) => {
 /**
  * 
  * @param {"Room" | "Message" | "User"} type 
- * @param {Object} extras 
+ * @param {Object} extras
  */
 const generateUUID = (type, extras = {}) => {
-    let UUID = crypto.randomUUID(),
-        group
-    ;
+    let group;
 
     switch(type) {
         case "Message":
@@ -1055,8 +886,11 @@ const generateUUID = (type, extras = {}) => {
             throw new TypeError(`${type} does not exist as an valid group type.`);
     }
 
-    while(group.includes(UUID))
+    let UUID;
+
+    do {
         UUID = crypto.randomUUID();
+    } while(group.includes(UUID));
 
     return UUID;
 };
