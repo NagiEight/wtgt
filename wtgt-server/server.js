@@ -895,6 +895,151 @@ const generateUUID = (type, extras = {}) => {
     return UUID;
 };
 
+const Logs = class {
+    /**
+     * Server's log. Use addEntry instead of changing this directly.
+     */
+    static logs = [];
+
+    /**
+     * A list of predefined suffix for most logging event types. Don't change this, please.
+     */
+    static formatList = {
+        connection: " connected.",
+        disconnection: " disconnected.",
+        election: " elected to modertor.",
+        demotion: " demoted by the host.",
+        host: " hosted a new room.",
+        join: " joined a room.",
+        leave: " left.",
+        pause: " paused.",
+        end: " ended their room session."
+    };
+    
+    static generateLogString = (logEntry, ...suffixes) => 
+        `[${logEntry.timestamp}]${logEntry.roomID === "" ? "" : `{${logEntry.roomID}}`} ${logEntry.entryTarget}${suffixes.join("")}`;
+    
+    /**
+     * Add a new entry to the logs.
+     * 
+     * @param {string} roomID 
+     * @param {"connection" | "disconnection" | "election" | "demotion" | "host" | "message" | "join" | "leave" | "pause" | "sync" | "end" | "error"} entryType 
+     * @param {string} entryTarget 
+     * @param {Object} extras 
+     */
+    static addEntry = (roomID, entryType, entryTarget, extras = {}) => {
+        const allowedEntryType = [
+            "connection",
+            "disconnection",
+            "election",
+            "demotion",
+            "host",
+            "message",
+            "join",
+            "leave",
+            "pause",
+            "sync",
+            "end",
+            "error"
+        ];
+
+        if(!allowedEntryType.includes(entryType)) 
+            throw new TypeError(`Unknown entryType "${entryType}", please try again.`);
+
+        const logEntry = {
+            event: entryType,
+            entryTarget,
+            roomID,
+            ...extras,
+            timestamp: getCurrentTime()
+        };
+        Logs.logs.push(logEntry);
+
+        let LogString;
+        switch(logEntry.event) {
+            case "message":
+                LogString = Logs.generateLogString(logEntry, ": ", logEntry.text, "\n");
+                break;
+                
+            case "sync":
+                LogString = Logs.generateLogString(logEntry, ": Skipped to ", logEntry.to, ".\n");
+                break;
+                
+            case "error":
+                LogString = Logs.generateLogString(logEntry, `: Error: ${logEntry.message}`);
+                break;
+
+            default:
+                LogString = Logs.generateLogString(logEntry, Logs.formatList[logEntry.event], "\n");
+                break;
+        }
+        console.log(LogString);
+        sendAdminMessage({
+            type: "log",
+            content: LogString
+        });
+    }
+
+    static toString = () => {
+        let output = "";
+
+        for(const logEntry of Logs.logs) {
+            switch(logEntry.event) {
+                case "message":
+                    output += Logs.generateLogString(logEntry, ": ", logEntry.text, "\n");
+                    break;
+                    
+                case "sync":
+                    output += Logs.generateLogString(logEntry, ": Skipped to ", logEntry.to, ".\n");
+                    break;
+
+                case "error":
+                    output += Logs.generateLogString(logEntry, ": Error: ", logEntry.message, "\n");
+                    break;
+
+                default:
+                    output += Logs.generateLogString(logEntry, Logs.formatList[logEntry.event], "\n");
+                    break;
+            }
+        }
+
+        return output.trim();
+    }
+
+    /**
+     * Create a log file at logs.
+     */
+    static createLog = async () => {
+        const logstring = Logs.toString();
+        if(logstring === "")
+            return;
+
+        await fs.mkdir("logs", { recursive: true });
+        let files;
+
+        try {
+            files = await fs.readdir("./logs");
+        }
+        catch(err) {
+            console.error("Error reading folder:", err);
+            return;
+        }
+        
+        let logID,
+            fileName,
+            filePath
+        ;
+
+        do {
+            logID = crypto.randomUUID(),
+            fileName = `${logID}.log`,
+            filePath = path.join("logs", fileName);
+        } while(files.includes(fileName));
+        
+        await fs.writeFile(filePath, logstring, "utf-8");
+    };
+};
+
 // Log creation and shutdown handling
 server.on("error", (err) => {
     console.error("Server error:", err);
