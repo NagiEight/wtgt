@@ -951,7 +951,7 @@ const Logs = class {
             entryTarget,
             roomID,
             ...extras,
-            timestamp: getCurrentTime()
+            timestamp: utils.getCurrentTime()
         };
         Logs.logs.push(logEntry);
 
