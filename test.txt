@@ -1,0 +1,12 @@
+class program {
+    static void greet(string name) {
+        say($"Hello {name}");
+    }
+
+    start {
+        string mood = "happy";
+        if(mood == "happy") {
+            greet("Nagi");
+        }
+    }
+}

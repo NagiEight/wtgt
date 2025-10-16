@@ -106,7 +106,7 @@ wss.on("connection", (client, req) => {
         }
     });
     
-    utils.Logs.addEntry("", "connection", UserID);
+    Logs.addEntry("", "connection", UserID);
 
     members[UserID] = {
         UserName: userProfile.UserName,
@@ -119,7 +119,7 @@ wss.on("connection", (client, req) => {
         if(UserID === adminID) 
             adminID = "";
         
-        utils.Logs.addEntry("", "disconnection", UserID);
+        Logs.addEntry("", "disconnection", UserID);
         delete members[UserID];
     });
 
@@ -184,7 +184,7 @@ wss.on("connection", (client, req) => {
              *  {
              *      "type": "adminInit", 
              *      "content": {
-             *          "utils.Logs": "Serverutils.Logs",
+             *          "Logs": "ServerLogs",
              *          "Rooms": {
              *              "roomID": {
              *                  "currentMedia": "medianame.mp4",
@@ -211,7 +211,7 @@ wss.on("connection", (client, req) => {
              *  }
              *  {
              *      "type": "log",
-             *      "content": "utils.Logstring"
+             *      "content": "Logstring"
              *  }
              */
             case "adminLogin":
@@ -296,7 +296,7 @@ const shutdown = () => {
     });
 
     server.close(async () => {
-        await utils.Logs.createLog();
+        await Logs.createLog();
         console.log("All connections closed, exiting.");
         process.exit(0);
     });
@@ -324,7 +324,7 @@ const sendError = (client, message, UserID) => {
         content: message
     }));
 
-    utils.Logs.addEntry("", "error", UserID, { message })
+    Logs.addEntry("", "error", UserID, { message })
 };
 
 /**
@@ -409,7 +409,7 @@ const host = (ContentJSON, client, UserID) => {
         }
     });
 
-    utils.Logs.addEntry(RoomID, "host", UserID);
+    Logs.addEntry(RoomID, "host", UserID);
 };
 
 /**
@@ -522,7 +522,7 @@ const join = (ContentJSON, client, UserID) => {
         }
     });
 
-    utils.Logs.addEntry(members[UserID].In, "join", UserID);
+    Logs.addEntry(members[UserID].In, "join", UserID);
 };
 
 /** 
@@ -580,7 +580,7 @@ const sendMessage = (ContentJSON, client, UserID) => {
         }
     }, UserID);
 
-    utils.Logs.addEntry(RoomID, "message", UserID, { text: ContentJSON.content });
+    Logs.addEntry(RoomID, "message", UserID, { text: ContentJSON.content });
 };
 
 /**
@@ -634,7 +634,7 @@ const election = (ContentJSON, client, UserID) => {
                 }
             });
 
-            utils.Logs.addEntry(RoomID, "election", ContentJSON.content);
+            Logs.addEntry(RoomID, "election", ContentJSON.content);
             break;
         case !doesMemberHasPermission:
             sendError(client, `Insufficient permission.`, UserID);
@@ -698,7 +698,7 @@ const demotion = (ContentJSON, client, UserID) => {
                 }
             });
 
-            utils.Logs.addEntry(RoomID, "demotion", ContentJSON.content);
+            Logs.addEntry(RoomID, "demotion", ContentJSON.content);
             break;
         case !doesMemberHasPermission:
             sendError(client, `Insufficient permission.`, UserID);
@@ -763,7 +763,7 @@ const leave = (client, UserID) => {
             content: RoomID
         });
 
-        utils.Logs.addEntry(RoomID, "end", UserID);
+        Logs.addEntry(RoomID, "end", UserID);
     }
     else {
         rooms[RoomID].members = rooms[RoomID].members.filter(member => member !== UserID);
@@ -778,7 +778,7 @@ const leave = (client, UserID) => {
             }
         });
 
-        utils.Logs.addEntry(RoomID, "leave", UserID);
+        Logs.addEntry(RoomID, "leave", UserID);
     }
 };
 
@@ -805,7 +805,7 @@ const pause = (ContentJSON, client, UserID) => {
     rooms[RoomID].isPaused = ContentJSON.content;
     broadcastToRoom(RoomID, ContentJSON);
 
-    utils.Logs.addEntry(RoomID, "pause", UserID);
+    Logs.addEntry(RoomID, "pause", UserID);
 };
 
 /**
@@ -830,7 +830,7 @@ const sync = (ContentJSON, client, UserID) => {
 
     broadcastToRoom(RoomID, ContentJSON, UserID);
 
-    utils.Logs.addEntry(RoomID, "sync", UserID, { to: ContentJSON.content });
+    Logs.addEntry(RoomID, "sync", UserID, { to: ContentJSON.content });
 };
 
 const adminLogin = (UserID, adminClient) => {
@@ -847,7 +847,7 @@ const adminLogin = (UserID, adminClient) => {
     adminClient.send(JSON.stringify({
         type: "adminInit", 
         content: {
-            Logs: utils.Logs.toString(),
+            Logs: Logs.toString(),
             Rooms: rooms,
             Members: membersObj
         }
