@@ -96,7 +96,7 @@ export function pauseMedia(isPaused) {
 
 // Chat functions
 export function sendChatMessage(text) {
-    sendMessage('message', { text });
+    sendMessage('message', { text }.text);
 }
 
 // Moderation functions
