@@ -312,9 +312,11 @@ const broadcastToRoom = (RoomID, message, except = null) => {
             continue;
 
         const member = members[memberID];
-        if(member && member.Socket)
-            if(member.Socket.readyState === ws.OPEN)
+        if(member && member.Socket) {
+            if(member.Socket.readyState === ws.OPEN) {
                 member.Socket.send(JSON.stringify(message));
+            }
+        }
     }
 };
 
@@ -503,7 +505,7 @@ const join = (ContentJSON, client, UserID) => {
     if(rooms[RoomID].type === "private") 
         toSend.RoomID = RoomID;
 
-    client.send(JSON.stringify({ type: "init", content: toSend}));
+    client.send(JSON.stringify({ type: "init", content: toSend }));
 
     broadcastToRoom(members[UserID].In, {
         type: "join",
@@ -562,7 +564,7 @@ const sendMessage = (ContentJSON, client, UserID) => {
         return;
     }
 
-    const MessageID = generateUUID("Message", {RoomID}),
+    const MessageID = generateUUID("Message", { RoomID }),
         MessageObject = {
             Sender: UserID,
             Text: ContentJSON.content,
