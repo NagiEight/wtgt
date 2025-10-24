@@ -14,20 +14,17 @@ export default function ChatLayout() {
     const unsubRoom = subscribe("join", (roomData) => {
       setRoomInfo(roomData);
       if (roomData.messages) {
+        // roomData.messages is an object: { [MessageID]: MessageObject }
         setMessages(Object.values(roomData.messages));
       }
     });
 
     // Subscribe to new messages
-    const unsubMessage = subscribe("message", (messageData) => {
-      setMessages((prev) => [
-        ...prev,
-        {
-          Sender: messageData.Sender,
-          Text: messageData.Text,
-          Timestamp: messageData.Timestamp || new Date().toISOString(),
-        },
-      ]);
+    const unsubMessage = subscribe("message", (msgContent) => {
+      // msgContent: { MessageID, MessageObject }
+      if (msgContent && msgContent.MessageObject) {
+        setMessages((prev) => [...prev, msgContent.MessageObject]);
+      }
     });
 
     // Subscribe to member updates

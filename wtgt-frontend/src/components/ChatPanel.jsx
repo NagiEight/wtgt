@@ -35,7 +35,20 @@ export default function ChatPanel({ messages = [], members = {} }) {
               )}
               <p>{msg.Text}</p>
               <span className="text-xs text-gray-300 block text-right mt-1">
-                {new Date(msg.Timestamp).toLocaleTimeString()}
+                {(() => {
+                  // Expecting format: "23:07:40 24/10/2025"
+                  const ts = msg.Timestamp;
+                  if (typeof ts === "string") {
+                    const match = ts.match(
+                      /^(\d{2}:\d{2}:\d{2}) (\d{2})\/(\d{2})\/(\d{4})$/
+                    );
+                    if (match) {
+                      // const [_, time, day, month, year] = match;
+                      return match[1]; // Just show HH:mm:ss
+                    }
+                  }
+                  return ts || "";
+                })()}
               </span>
             </div>
           </div>
