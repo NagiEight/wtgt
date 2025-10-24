@@ -1,11 +1,13 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { connectToSocket } from "../utils/socket";
+import { connectToSocket, hostRoom, joinRoom } from "../utils/socket";
 
 export default function Connect({ onConnect }) {
   const [serverInput, setServerInput] = useState("ws://localhost:3000");
   const [username, setUsername] = useState("");
   const [avatar, setAvatar] = useState("");
+  const [roomId, setRoomId] = useState("");
+  const [isCreatingRoom, setIsCreatingRoom] = useState(true);
   const [error, setError] = useState("");
   const navigate = useNavigate();
 
@@ -15,17 +17,35 @@ export default function Connect({ onConnect }) {
       return;
     }
 
+    if (!isCreatingRoom && !roomId.trim()) {
+      setError("Room ID is required to join a room");
+      return;
+    }
+
     try {
       const ws = connectToSocket(serverInput, username, avatar);
+
       ws.onopen = () => {
         // Store user info in localStorage for persistence
         localStorage.setItem(
           "userProfile",
           JSON.stringify({ username, avatar })
         );
+
+        if (isCreatingRoom) {
+          hostRoom({
+            RoomType: "public", // or could make this configurable
+            MediaName: "", // could add media URL input if needed
+            IsPaused: true,
+          });
+        } else {
+          joinRoom(roomId);
+        }
+
         navigate("/watch");
         onConnect?.(serverInput);
       };
+
       ws.onerror = () =>
         setError("Failed to connect. Check the address and try again.");
     } catch (err) {
@@ -62,11 +82,45 @@ export default function Connect({ onConnect }) {
           onChange={(e) => setAvatar(e.target.value)}
           className="w-full px-4 py-2 rounded bg-gray-800 text-white border border-gray-700 focus:outline-none focus:border-blue-500"
         />
+
+        <div className="flex gap-4">
+          <button
+            onClick={() => setIsCreatingRoom(true)}
+            className={`flex-1 px-4 py-2 rounded font-medium transition-colors ${
+              isCreatingRoom
+                ? "bg-blue-600 text-white"
+                : "bg-gray-700 text-gray-300 hover:bg-gray-600"
+            }`}
+          >
+            Create Room
+          </button>
+          <button
+            onClick={() => setIsCreatingRoom(false)}
+            className={`flex-1 px-4 py-2 rounded font-medium transition-colors ${
+              !isCreatingRoom
+                ? "bg-blue-600 text-white"
+                : "bg-gray-700 text-gray-300 hover:bg-gray-600"
+            }`}
+          >
+            Join Room
+          </button>
+        </div>
+
+        {!isCreatingRoom && (
+          <input
+            type="text"
+            placeholder="Room ID"
+            value={roomId}
+            onChange={(e) => setRoomId(e.target.value)}
+            className="w-full px-4 py-2 rounded bg-gray-800 text-white border border-gray-700 focus:outline-none focus:border-blue-500"
+          />
+        )}
+
         <button
           onClick={handleConnect}
           className="w-full px-6 py-2 bg-blue-600 hover:bg-blue-700 rounded font-medium"
         >
-          Connect
+          {isCreatingRoom ? "Create & Connect" : "Join & Connect"}
         </button>
         {error && <p className="text-red-400 text-center">{error}</p>}
       </div>
