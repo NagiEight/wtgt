@@ -1,12 +1,15 @@
-import TopBar from "./components/TopBar";
+import { BrowserRouter as Router, Routes, Route } from "react-router-dom";
 import Connect from "./pages/Connect";
 import Watch from "./pages/Watch";
 
-export default function App() {
+function App() {
   return (
-    <div className="min-h-screen bg-gray-900 text-white">
-      <TopBar />
-      <Connect></Connect>
-    </div>
+    <Router>
+      <Routes>
+        <Route path="/" element={<Connect />} />
+        <Route path="/watch" element={<Watch />} />
+      </Routes>
+    </Router>
   );
 }
+export default App;
