@@ -1,6 +1,4 @@
-const crypto = require("crypto"),
-    fs = require("fs/promises"),
-    path = require("path")
+const crypto = require("crypto")
 ;
 
 /**
@@ -59,9 +57,11 @@ const validateMessage = (message, sample) => {
         return false;
 
     if(typeMessage === "array") {
-        for(const item of message) 
-            if(!validateMessage(item, sample[0])) 
+        for(const item of message) {
+            if(!validateMessage(item, sample[0])) {
                 return false;
+            }
+        }
         
         return true;
     }
@@ -70,9 +70,11 @@ const validateMessage = (message, sample) => {
         if(!sameKeys(message, sample)) 
             return false;
 
-        for(const key of Object.keys(message)) 
-            if(!validateMessage(message[key], sample[key])) 
+        for(const key of Object.keys(message)) {
+            if(!validateMessage(message[key], sample[key])) {
                 return false;
+            }
+        }
 
         return true;
     }
