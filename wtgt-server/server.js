@@ -564,7 +564,7 @@ const sendMessage = (ContentJSON, client, UserID) => {
         return;
     }
 
-    const MessageID = generateUUID("Message", { RoomID }),
+    const MessageID = generateUUID("Message", {RoomID }),
         MessageObject = {
             Sender: UserID,
             Text: ContentJSON.content,
@@ -580,7 +580,7 @@ const sendMessage = (ContentJSON, client, UserID) => {
             MessageID,
             MessageObject
         }
-    }, UserID);
+    });
 
     Logs.addEntry(RoomID, "message", UserID, { text: ContentJSON.content });
 };
