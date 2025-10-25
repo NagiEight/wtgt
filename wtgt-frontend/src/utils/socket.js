@@ -92,7 +92,7 @@ export function updateMediaState(isPaused, currentTime) {
     sendMessage('sync', { isPaused, currentTime });
 }
 export function updateSeek(currentTime) {
-    sendMessage('sync', urrentTime);
+    sendMessage('sync', currentTime);
 }
 
 export function pauseMedia(isPaused) {
