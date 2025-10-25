@@ -170,6 +170,10 @@ wss.on("connection", (client, req) => {
                 sync(ContentJSON, client, UserID);
                 break;
 
+            case "upload":
+                upload(ContentJSON, client, UserID);
+                break;
+
             /**
              * Admin messages.
              */
@@ -209,6 +213,7 @@ wss.on("connection", (client, req) => {
              *          }
              *      }
              *  }
+             * 
              *  {
              *      "type": "log",
              *      "content": "Logstring"
@@ -833,6 +838,26 @@ const sync = (ContentJSON, client, UserID) => {
     broadcastToRoom(RoomID, ContentJSON, UserID);
 
     Logs.addEntry(RoomID, "sync", UserID, { to: ContentJSON.content });
+};
+
+/**
+ *  ```json
+ *  {
+ *      "type": "upload",
+ *      "content": "hello world.mp4"
+ *  }
+ *  ```
+ */
+const upload = (ContentJSON, client, UserID) => {
+    if(!utils.validateMessage(ContentJSON, { type: "test", content: "test" })) {
+        sendError(client, `Invalid message format for ${ContentJSON.type}.`, UserID);
+        return;
+    }
+
+    const roomID = members[UserID].In;
+    rooms[roomID].currentMedia = ContentJSON.content;
+
+    broadcastToRoom(roomID, ContentJSON, UserID);
 };
 
 const adminLogin = (UserID, adminClient) => {

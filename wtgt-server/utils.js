@@ -46,7 +46,7 @@ const getType = (object) => {
 /**
  * Perform a deep analysis on message, using sample as a control.
  * @param {any} message 
- * @param {any} sample 
+ * @param {any} sample The structure of the message
  * @returns Whether the message matches with the sample.
  */
 const validateMessage = (message, sample) => {
@@ -57,6 +57,9 @@ const validateMessage = (message, sample) => {
         return false;
 
     if(typeMessage === "array") {
+        if(sample.length === 0)
+            return Array.isArray(message);
+
         for(const item of message) {
             if(!validateMessage(item, sample[0])) {
                 return false;
