@@ -74,7 +74,8 @@ export function getSocket() {
 
 // Room management functions
 export function joinRoom(roomId) {
-    sendMessage('join', { roomID: roomId });
+    localStorage.setItem('isHost', 'false');
+    sendMessage('join', roomId);
 }
 
 export function leaveRoom() {
@@ -82,6 +83,7 @@ export function leaveRoom() {
 }
 
 export function hostRoom(roomConfig) {
+    localStorage.setItem('isHost', 'true');
     sendMessage('host', roomConfig);
 }
 
