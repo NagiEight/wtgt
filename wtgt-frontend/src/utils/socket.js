@@ -91,9 +91,12 @@ export function hostRoom(roomConfig) {
 export function updateMediaState(isPaused, currentTime) {
     sendMessage('sync', { isPaused, currentTime });
 }
+export function updateSeek(currentTime) {
+    sendMessage('sync', urrentTime);
+}
 
 export function pauseMedia(isPaused) {
-    sendMessage('pause', { isPaused });
+    sendMessage('pause', isPaused);
 }
 
 // Chat functions
