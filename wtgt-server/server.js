@@ -824,7 +824,7 @@ const pause = (ContentJSON, client, UserID) => {
  *  ```
  */
 const sync = (ContentJSON, client, UserID) => {
-    if(!utils.validateMessage(ContentJSON, { type: "test", content: 1 })) {
+    if(!utils.validateMessage(ContentJSON, { type: "test", content: 1.1 })) {
         sendError(client, `Invalid message format for ${ContentJSON.type}.`, UserID);
         return;
     }
@@ -858,6 +858,7 @@ const upload = (ContentJSON, client, UserID) => {
     rooms[roomID].currentMedia = ContentJSON.content;
 
     broadcastToRoom(roomID, ContentJSON, UserID);
+    Logs.addEntry(roomID, "upload", UserID, );
 };
 
 const adminLogin = (UserID, adminClient) => {
@@ -940,7 +941,8 @@ const Logs = class {
         join: " joined a room.",
         leave: " left.",
         pause: " paused.",
-        end: " ended their room session."
+        end: " ended their room session.",
+        upload: " uploaded a new media to their room."
     };
     
     static generateLogString = (logEntry, ...suffixes) => 
@@ -950,7 +952,7 @@ const Logs = class {
      * Add a new entry to the logs.
      * 
      * @param {string} roomID 
-     * @param {"connection" | "disconnection" | "election" | "demotion" | "host" | "message" | "join" | "leave" | "pause" | "sync" | "end" | "error"} entryType 
+     * @param {"connection" | "disconnection" | "election" | "demotion" | "host" | "message" | "join" | "leave" | "pause" | "sync" | "end" | "error" | "upload"} entryType 
      * @param {string} entryTarget 
      * @param {Object} extras 
      */
@@ -967,6 +969,7 @@ const Logs = class {
             "pause",
             "sync",
             "end",
+            "upload",
             "error"
         ];
 
@@ -993,13 +996,14 @@ const Logs = class {
                 break;
                 
             case "error":
-                LogString = Logs.generateLogString(logEntry, `: Error: ${logEntry.message}`);
+                LogString = Logs.generateLogString(logEntry, `: Error: ${logEntry.message}`, "\n");
                 break;
 
             default:
                 LogString = Logs.generateLogString(logEntry, Logs.formatList[logEntry.event], "\n");
                 break;
         }
+        
         console.log(LogString);
         sendAdminMessage({
             type: "log",
