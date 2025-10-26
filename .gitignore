@@ -1,4 +1,6 @@
 logs/
 server-properties/
+node_modules/
 
+package-lock.json
 run.bat
