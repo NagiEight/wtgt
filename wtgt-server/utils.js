@@ -1,5 +1,4 @@
-const crypto = require("crypto")
-;
+import crypto from "crypto";
 
 /**
  * @param {Object} a First Object.
@@ -131,7 +130,7 @@ const getCurrentTime = () => {
     return formatted;
 };
 
-module.exports = { 
+export default { 
     generatePassword,
     validateMessage,
     getCurrentTime

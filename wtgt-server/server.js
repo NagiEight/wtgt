@@ -1,28 +1,32 @@
 //Imports
-const http = require("http"),
-    ws = require("ws"),
-    crypto = require("crypto"),
-    fs = require("fs/promises"),
-    utils = require("./utils"),
-    path = require("path")
-;
+import http from "http";
+import ws, { WebSocketServer } from "ws";
+import crypto from "crypto";
+import fs from "fs/promises";
+import path from "path";
+import utils from "./utils.js";
 
 //Constants
-const PORT = 3000,
+const server = http.createServer((req, res) => {
+        
+    }),
+    wss = new WebSocketServer({ server }),
     /**
      *  ```js
-     *  roomID: {
-     *      currentMedia: "medianame.mp4",
-     *      host: "hostID"
-     *      type: "private"
-     *      mods: [],
-     *      members: [memberIDs],
-     *      isPaused: false,
-     *      messages: {
-     *          messageID: {
-     *              Sender: "memberID",
-     *              Text: "hello world!",
-     *              Timestamp: "somethingsomething"
+     *  const rooms = {
+     *      roomID: {
+     *          currentMedia: "medianame.mp4",
+     *          host: "hostID"
+     *          type: "private"
+     *          mods: [],
+     *          members: [memberIDs],
+     *          isPaused: false,
+     *          messages: {
+     *              messageID: {
+     *                  Sender: "memberID",
+     *                  Text: "hello world!",
+     *                  Timestamp: "somethingsomething"
+     *              }
      *          }
      *      }
      *  }
@@ -31,23 +35,22 @@ const PORT = 3000,
     rooms = {},
     /**
      *  ```js
-     *  MemberID: {
-     *      UserName: "Claire Iidea",
-     *      In: "roomID",
-     *      Socket: wsObj,
-     *      Avt: "uri"
+     *  const members = {
+     *      MemberID: {
+     *          UserName: "Claire Iidea",
+     *          In: "roomID",
+     *          Socket: wsObj,
+     *          Avt: "uri"
+     *      }
      *  }
      *  ```
      */
     members = {},
-    server = http.createServer((req, res) => {
-        
-    }),
-    wss = new ws.Server({ server }),
     propertiesPath = "./server-properties",
     defaultConfig = {
         adminPasswordLength: 16,
         maxAdminLoginAttempts: 5,
+        PORT: 3000,
         regeneratePassword: true
     }
 ;
@@ -58,7 +61,9 @@ let credentials = "",
     config = {}
 ;
 
-(async () => {
+
+
+await (async () => {
     await fs.mkdir("server-properties", { recursive: true });
     const configPath = path.join(propertiesPath, "config.json");
     const passwordPath = path.join(propertiesPath, "password.txt");
@@ -569,7 +574,7 @@ const sendMessage = (ContentJSON, client, UserID) => {
         return;
     }
 
-    const MessageID = generateUUID("Message", {RoomID }),
+    const MessageID = generateUUID("Message", { RoomID }),
         MessageObject = {
             Sender: UserID,
             Text: ContentJSON.content,
@@ -1091,6 +1096,6 @@ process.on("unhandledRejection", (reason) => {
     shutdown();
 });
 
-server.listen(PORT, () => {
-    console.log(`Hello World! Server's running at port: ${PORT}.`);
+server.listen(config.PORT, () => {
+    console.log(`Hello World! Server's running at port: ${config.PORT}.`);
 });
