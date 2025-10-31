@@ -130,7 +130,7 @@ const getCurrentTime = () => {
     return formatted;
 };
 
-export default { 
+export default {
     generatePassword,
     validateMessage,
     getCurrentTime

@@ -61,8 +61,6 @@ let credentials = "",
     config = {}
 ;
 
-
-
 await (async () => {
     await fs.mkdir("server-properties", { recursive: true });
     const configPath = path.join(propertiesPath, "config.json");
