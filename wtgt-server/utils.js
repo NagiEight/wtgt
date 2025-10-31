@@ -65,8 +65,6 @@ const validateMessage = (message, sample) => {
                 return false;
             }
         }
-        
-        return true;
     }
 
     if(typeMessage === "object") {
@@ -78,19 +76,21 @@ const validateMessage = (message, sample) => {
                 return false;
             }
         }
-
-        return true;
     }
 
     return true;
 };
 
 /**
- * Generate a password with the minimum length of 16.
+ * Generate a string of password.
  * @param {number} length 
  * @returns The password. Charset include alphanumeric characters and specials characters.
  */
-const generatePassword = (length = 16) => {    
+const generatePassword = (length = 16) => {
+    if(length <= 0) {
+        length = 16;
+    }
+
     const 
         alpha = "abcdefghijklmnopqstuvwxyz",
         alphaUp = alpha.toUpperCase(),

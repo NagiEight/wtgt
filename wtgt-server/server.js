@@ -1062,11 +1062,12 @@ const Logs = class {
         ;
 
         do {
-            logID = crypto.randomUUID(),
-            fileName = `${logID}.log`,
-            filePath = path.join("logs", fileName);
+            logID = crypto.randomUUID();
+            fileName = `${logID}.log`;
         } while(files.includes(fileName));
         
+        filePath = path.join("logs", fileName);
+
         await fs.writeFile(filePath, logstring, "utf-8");
     };
 };

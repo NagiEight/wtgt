@@ -2,5 +2,6 @@ logs/
 server-properties/
 node_modules/
 
+test*
 package-lock.json
 run.bat
