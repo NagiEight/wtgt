@@ -1,0 +1,10 @@
+{
+    "compilerOptions": {
+        "outDir": "./cmpl",
+        "rootDir": "./",
+        "module": "NodeNext",
+        "moduleResolution": "nodenext",
+        "target": "es2020",
+        "types": ["node"]
+    }
+}

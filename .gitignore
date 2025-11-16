@@ -1,6 +1,7 @@
 logs/
 server-properties/
 node_modules/
+cmpl/
 
 test*
 package-lock.json
