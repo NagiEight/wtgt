@@ -7,6 +7,7 @@ import * as ws from "ws";
 import validateMessage from "./validateMessage.js";
 import getCurrentTime from "./getCurrentTime.js";
 import generatePassword from "./generatePassword.js";
+import resolveBadFileName from "./resolveFileName.js";
 
 import * as sendMessageTypes from "./sendMessageType.js";
 import * as adminSendMessageTypes from "./adminSendMessageTypes.js";
@@ -537,8 +538,8 @@ const shutdown = (): void => {
         catch {}
     });
 
-    server.close(async (): Promise<void> => {
-        await Logs.createLog();
+    server.close((): void => {
+        Logs.createLog().then();
         process.exit(0);
     });
 };
@@ -715,7 +716,7 @@ const Logs = class {
 
         do {
             logID = crypto.randomUUID();
-            fileName = `${getCurrentTime()}_${logID}.log`;
+            fileName = resolveBadFileName(`${getCurrentTime()}_${logID}.log`);
         } while(files.includes(fileName));
         
         filePath = path.join("logs", fileName);
@@ -732,12 +733,14 @@ process.on("SIGHUP", shutdown);
 process.on("uncaughtException", shutdown);
 process.on("unhandledRejection", shutdown);
 
-server.listen(config.PORT, () => {
+server.listen(config.PORT, (): void => {
     console.log(`Hello World! Server's running at port: ${config.PORT}.`);
 
     const hoursToMs = (hours: number): number => hours * 3600000;
 
-    setInterval(async () => {
-        await Logs.createLog();
+    setInterval((): void => {
+        Logs.createLog().then(() => {
+            console.log("Log file written, clearing server log...")
+        });
     }, hoursToMs(12));
 });

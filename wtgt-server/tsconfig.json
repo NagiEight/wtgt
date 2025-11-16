@@ -5,6 +5,7 @@
         "module": "NodeNext",
         "moduleResolution": "nodenext",
         "target": "es2020",
+        "lib": ["es2021"],
         "types": ["node"]
     }
 }
