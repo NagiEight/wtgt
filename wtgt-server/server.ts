@@ -3,7 +3,7 @@ import * as fs from "fs/promises";
 import * as path from "path";
 import * as crypto from "crypto";
 import * as ws from "ws";
-
+ 
 import validateMessage from "./validateMessage.js";
 import getCurrentTime from "./getCurrentTime.js";
 import generatePassword from "./generatePassword.js";
@@ -11,6 +11,8 @@ import resolveBadFileName from "./resolveFileName.js";
 
 import * as sendMessageTypes from "./sendMessageType.js";
 import * as adminSendMessageTypes from "./adminSendMessageTypes.js";
+import * as receiveMessageTypes from "./receiveMessageTypes.js";
+import * as adminReceiveMessageTypes from "./adminReceiveMessageTypes.js";
 
 interface RoomsObj {
     [roomID: string]: {
@@ -66,6 +68,17 @@ type ContentJSONType = sendMessageTypes.host | sendMessageTypes.join | sendMessa
     sendMessageTypes.message | sendMessageTypes.election | sendMessageTypes.demotion |
     sendMessageTypes.pause | sendMessageTypes.sync | sendMessageTypes.upload |
     adminSendMessageTypes.adminLogin | adminSendMessageTypes.adminLogout | adminSendMessageTypes.shutdown
+;
+
+type SendMessageTypes = receiveMessageTypes.info | receiveMessageTypes.init | receiveMessageTypes.join |
+    receiveMessageTypes.message | receiveMessageTypes.election | receiveMessageTypes.demotion |
+    receiveMessageTypes.leave | receiveMessageTypes.end | receiveMessageTypes.pause |
+    receiveMessageTypes.sync | receiveMessageTypes.upload
+;
+
+type AdminSendMessageTypes = adminReceiveMessageTypes.adminInit | adminReceiveMessageTypes.log | adminReceiveMessageTypes.userHost |
+    adminReceiveMessageTypes.userJoin | adminReceiveMessageTypes.userElection | adminReceiveMessageTypes.userDemotion |
+    adminReceiveMessageTypes.memberLeave | adminReceiveMessageTypes.roomEnd | adminReceiveMessageTypes.connection
 ;
 
 const server: http.Server<typeof http.IncomingMessage, typeof http.ServerResponse> = http.createServer((req, res) => {
@@ -132,11 +145,11 @@ wss.on("connection", (client: ws.WebSocket, req: http.IncomingMessage): void => 
         Socket: client
     };
     
-    broadcastToAdmins("connection", {
+    broadcastToAdmins({ type: "connection", content: {
         MemberID: UserID,
         UserName: userProfile.UserName,
         Avt: userProfile.Avt
-    });
+    } });
 
     client.on("close", (): void => {
         if(adminIDs.includes(UserID))  
@@ -236,12 +249,12 @@ const host = (UserID: string, ContentJSON: sendMessageTypes.host): void => {
         content: RoomID
     }));
 
-    broadcastToAdmins("userHost", {
+    broadcastToAdmins({ type: "userHost", content: {
         RoomID,
         MediaName: ContentJSON.content.MediaName,
         IsPaused: ContentJSON.content.IsPaused,
         Host: UserID
-    });
+    } });
 
     Logs.addEntry(RoomID, "host", UserID);
 };
@@ -286,16 +299,16 @@ const join = (UserID: string, ContentJSON: sendMessageTypes.join): void => {
 
     getSession(UserID).send(JSON.stringify({ type: "init", content: toSend }));
 
-    broadcastToRoom(RoomID, "join", {
+    broadcastToRoom(RoomID, { type: "join", content: {
         UserID,
         UserName: members[UserID].UserName,
         Avt: members[UserID].Avt
-    }, UserID);
+    } }, UserID);
 
-    broadcastToAdmins("userJoin", {
+    broadcastToAdmins({ type: "userJoin", content: {
         UserID,
         Target: RoomID
-    });
+    } });
 
     Logs.addEntry(RoomID, "join", UserID);
 };
@@ -321,10 +334,10 @@ const sendMessage = (UserID: string, ContentJSON: sendMessageTypes.message): voi
 
     rooms[RoomID].messages[MessageID] = MessageObject;
 
-    broadcastToRoom(RoomID, "message", {
+    broadcastToRoom(RoomID, { type: "message", content: {
         MessageID,
-        MessageObject
-    });
+        ...MessageObject
+    } });
 
     Logs.addEntry(RoomID, "message", UserID, { text: ContentJSON.content });
 };
@@ -349,12 +362,12 @@ const election = (UserID: string, ContentJSON: sendMessageTypes.election): void 
     if(isEligibleForElection) {
         rooms[RoomID].mods.push(ContentJSON.content);
 
-        broadcastToRoom(RoomID, "election", ContentJSON.content);
+        broadcastToRoom(RoomID, { type: "election", content: ContentJSON.content });
 
-        broadcastToAdmins("userElection", {
+        broadcastToAdmins({ type: "userElection", content: {
             RoomID,
             Target: ContentJSON.content
-        });
+        }});
     }
     else if(!doesMemberHasPermission) 
         sendError(UserID, "Insufficient permission.");
@@ -383,12 +396,12 @@ const demotion = (UserID: string, ContentJSON: sendMessageTypes.demotion): void 
     if(isEligibleForDemotion) {
         rooms[RoomID].mods = rooms[RoomID].mods.filter(member => member !== ContentJSON.content);
 
-        broadcastToRoom(RoomID, "demotion", ContentJSON.content);
+        broadcastToRoom(RoomID, { type: "demotion", content: ContentJSON.content });
 
-        broadcastToAdmins("userDemotion", {
+        broadcastToAdmins({ type: "userDemotion", content: {
             RoomID,
             Target: ContentJSON.content
-        });
+        } });
 
         Logs.addEntry(RoomID, "demotion", ContentJSON.content);
     }
@@ -410,26 +423,26 @@ const leave = (UserID: string, ContentJSON: sendMessageTypes.leave) => {
 
     const RoomID: string = members[UserID].In;
     if(UserID === rooms[RoomID].host) {
-        broadcastToRoom(RoomID, "end");
+        broadcastToRoom(RoomID, { type: "end", content: undefined });
         
         for(const MemberID of rooms[RoomID].members)
             members[MemberID].In = "";
 
         delete rooms[RoomID];
 
-        broadcastToAdmins("roomEnd", RoomID);
+        broadcastToAdmins({type: "roomEnd", content: RoomID});
 
         Logs.addEntry(RoomID, "end", UserID);
     }
     else {
         rooms[RoomID].members = rooms[RoomID].members.filter(member => member !== UserID);
-        broadcastToRoom(RoomID, "leave", UserID);
+        broadcastToRoom(RoomID, { type: "leave", content: UserID });
         members[UserID].In = "";
 
-        broadcastToAdmins("memberLeave", {
+        broadcastToAdmins({ type: "memberLeave", content: {
             RoomID,
             UserID
-        });
+        } });
 
         Logs.addEntry(RoomID, "leave", UserID);
     }
@@ -446,7 +459,7 @@ const pause = (UserID: string, ContentJSON: sendMessageTypes.pause) => {
     rooms[RoomID].isPaused = ContentJSON.content;
 
     
-    broadcastToRoom(RoomID, "pause", ContentJSON.content);
+    broadcastToRoom(RoomID, { type: "pause", content: ContentJSON.content });
 
     Logs.addEntry(RoomID, "pause", UserID);
 };
@@ -459,7 +472,7 @@ const sync = (UserID: string, ContentJSON: sendMessageTypes.sync) => {
     if(UserID !== rooms[RoomID].host && rooms[RoomID].type === "public") 
         return sendError(UserID, "Insufficient permission.");
 
-    broadcastToRoom(RoomID, "sync", ContentJSON.content);
+    broadcastToRoom(RoomID, { type: "sync", content: ContentJSON.content });
 
     Logs.addEntry(RoomID, "sync", UserID, { to: ContentJSON.content });
 };
@@ -471,7 +484,7 @@ const upload = (UserID: string, ContentJSON: sendMessageTypes.upload) => {
     const roomID = members[UserID].In;
     rooms[roomID].currentMedia = ContentJSON.content;
 
-    broadcastToRoom(roomID, "upload", ContentJSON.content);
+    broadcastToRoom(roomID, { type: "upload", content: ContentJSON.content });
     Logs.addEntry(roomID, "upload", UserID);
 };
 
@@ -544,7 +557,7 @@ const shutdown = (): void => {
     });
 };
 
-const broadcastToAdmins = (type: string, content?: string | { [Props: string]: any }): void => {
+const broadcastToAdmins = ({ type, content }: AdminSendMessageTypes): void => {
     for(const adminID of adminIDs) 
         getSession(adminID).send(JSON.stringify({
             type,
@@ -552,27 +565,15 @@ const broadcastToAdmins = (type: string, content?: string | { [Props: string]: a
         }));
 };
 
-const broadcastToRoom = (roomID: string, type: string, content?: boolean | number | string | { [Props: string]: any }, except?: string | string[]): void => {
+const broadcastToRoom = (roomID: string, { type, content }: SendMessageTypes, ...except: string[]): void => {
     if(!rooms[roomID])
         return;
 
     for(const memberID of rooms[roomID].members) {
-        if(typeof except === "string") {
-            if(memberID === except) {
-                continue;
-            }
-        }
-
-        if(except instanceof Array) {
-            if(except.includes(memberID)) {
-                continue;
-            }
-        }
-        
         const member = members[memberID];
         const session: ws.WebSocket = getSession(memberID);
         if(member && session) {
-            if(session.readyState === ws.WebSocket.OPEN) {
+            if(session.readyState === ws.WebSocket.OPEN && !except.includes(memberID)) {
                 session.send(JSON.stringify({
                     type,
                     content
@@ -670,10 +671,7 @@ const Logs = class {
         }
 
         console.log(logString);
-        broadcastToAdmins("log", {
-            type: "log",
-            content: logString
-        });
+        broadcastToAdmins({ type: "log", content: logString });
     }
 
     public static toString = (): string => Logs.Logs.map((logEntry: LogEntryType): string => {

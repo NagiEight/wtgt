@@ -61,7 +61,8 @@ interface leave {
 }
 
 interface end {
-    type: "end"
+    type: "end",
+    content: undefined
 }
 
 interface pause {
@@ -78,3 +79,17 @@ interface upload {
     type: "upload",
     content: string
 }
+
+export {
+    info,
+    init,
+    join,
+    message,
+    election,
+    demotion,
+    leave,
+    end,
+    pause,
+    sync,
+    upload
+};

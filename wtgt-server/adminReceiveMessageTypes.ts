@@ -28,6 +28,15 @@ interface adminInit {
     }
 }
 
+interface connection {
+    type: "connection",
+    content: {
+        MemberID: string,
+        UserName: string,
+        Avt: string
+    }
+}
+
 interface log {
     type: "log",
     content: string
@@ -80,3 +89,14 @@ interface roomEnd {
     content: string
 }
 
+export {
+    adminInit,
+    log,
+    userHost,
+    userJoin,
+    userElection,
+    userDemotion,
+    memberLeave,
+    roomEnd,
+    connection
+};

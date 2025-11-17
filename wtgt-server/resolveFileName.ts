@@ -3,7 +3,7 @@ const resolveBadFileName = (fileName: string, replacer: string = "_"): string =>
     let name: string;
     let extension: string;
     
-    if (lastDotIndex > 0 && lastDotIndex !== fileName.length - 1) {
+    if(lastDotIndex > 0 && lastDotIndex !== fileName.length - 1) {
         name = fileName.slice(0, lastDotIndex);
         extension = fileName.slice(lastDotIndex);
     }
