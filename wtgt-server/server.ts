@@ -3,7 +3,7 @@ import * as fs from "fs/promises";
 import * as path from "path";
 import * as crypto from "crypto";
 import * as ws from "ws";
- 
+
 import validateMessage from "./validateMessage.js";
 import getCurrentTime from "./getCurrentTime.js";
 import generatePassword from "./generatePassword.js";
@@ -674,6 +674,8 @@ const Logs = class {
         broadcastToAdmins({ type: "log", content: logString });
     }
 
+    public static clear = (): void => { Logs.Logs.length = 0 };
+
     public static toString = (): string => Logs.Logs.map((logEntry: LogEntryType): string => {
         switch(logEntry.event) {
             case "message":
@@ -720,7 +722,6 @@ const Logs = class {
         filePath = path.join("logs", fileName);
 
         await fs.writeFile(filePath, logString, "utf-8");
-        Logs.Logs.length = 0;
     };
 };
 
@@ -738,7 +739,8 @@ server.listen(config.PORT, (): void => {
 
     setInterval((): void => {
         Logs.createLog().then(() => {
-            console.log("Log file written, clearing server log...")
+            console.log("Log file written, clearing server log...");
+            Logs.clear();
         });
     }, hoursToMs(12));
 });
