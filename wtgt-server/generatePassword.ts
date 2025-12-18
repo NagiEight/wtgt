@@ -1,6 +1,6 @@
 import * as crypto from "crypto";
 
-const generatePassword = (length: number = 16): string => {
+const generatePassword = (length: number = 16, previous?: string): string => {
     if(length <= 0) 
         length = 16;
     
@@ -22,6 +22,9 @@ const generatePassword = (length: number = 16): string => {
         const charType = charSet[crypto.randomInt(0, charSet.length)];
         output += charType[crypto.randomInt(0, charType.length)];
     }
+
+    if(output === previous)
+        return generatePassword(length, previous);
 
     return output;
 };

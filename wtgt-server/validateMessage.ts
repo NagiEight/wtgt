@@ -1,18 +1,17 @@
-type getTypeResults = "string" | 
-    "bigint" | 
-    "boolean" | 
-    "symbol" | 
-    "undefined" | 
-    "object" | 
-    "function" | 
-    "null" | 
-    "Infinity" | 
-    "-Infinity" | 
-    "NaN" | 
-    "array" | 
-    "int" | 
-    "float"
-;
+type getTypeResults = 
+    | "string" 
+    | "bigint" 
+    | "boolean" 
+    | "symbol" 
+    | "undefined" 
+    | "object" 
+    | "function" 
+    | "null" 
+    | "Infinity" 
+    | "-Infinity" 
+    | "NaN" 
+    | "array" 
+    | "number";
 
 const sameKeys = (a: Object, b: object): boolean => 
     (Object.keys(a).sort().length === Object.keys(b).sort().length) && Object.keys(a).sort().every((k, i) => k === Object.keys(b).sort()[i]);
@@ -33,11 +32,6 @@ const getType = (object: any): getTypeResults => {
             return "NaN";
         case Array.isArray(object):
             return "array";
-        case type === "number":
-            if(Number.isInteger(object))
-                return "int";
-            else
-                return "float";
         default:
             return type;
     }
