@@ -8,14 +8,14 @@ import * as ws from "ws";
 
 import { existsSync } from "fs";
 
-import validateMessage from "./validateMessage.js";
-import getCurrentTime from "./getCurrentTime.js";
-import generatePassword from "./generatePassword.js";
+import validateMessage from "./helpers/validateMessage.js";
+import getCurrentTime from "./helpers/getCurrentTime.js";
+import generatePassword from "./helpers/generatePassword.js";
 
-import * as sendMessageTypes from "./client-to-server.js";
-import * as adminSendMessageTypes from "./admin-to-server.js";
-import * as receiveMessageTypes from "./server-to-client.js";
-import * as adminReceiveMessageTypes from "./server-to-admin.js";
+import * as sendMessageTypes from "./types/client-to-server.js";
+import * as adminSendMessageTypes from "./types/admin-to-server.js";
+import * as receiveMessageTypes from "./types/server-to-client.js";
+import * as adminReceiveMessageTypes from "./types/server-to-admin.js";
 
 interface RoomsObj {
     [RoomID: string]: {
@@ -216,413 +216,400 @@ wss.on("connection", (client: ws.WebSocket, req: http.IncomingMessage): void => 
 });
 
 const host = (UserID: string, ContentJSON: sendMessageTypes.host): void => {
-    if(!validateMessage(ContentJSON, { type: "test", content: { MediaName: "test", RoomType: "test", IsPaused: true }})) 
-        return sendError(UserID, `Invalid message format for ${ContentJSON.type}.`);
+        if(!validateMessage(ContentJSON, { type: "test", content: { MediaName: "test", RoomType: "test", IsPaused: true }})) 
+            return sendError(UserID, `Invalid message format for ${ContentJSON.type}.`);
 
-    const isInRoom = members[UserID].In !== "";
-    if(isInRoom) 
-        return sendError(UserID, `Member ${UserID} is already belong to a room.`);
+        const isInRoom = members[UserID].In !== "";
+        if(isInRoom) 
+            return sendError(UserID, `Member ${UserID} is already belong to a room.`);
 
-    const allowedRoomTypes = [
-        "private",
-        "public"
-    ];
+        const allowedRoomTypes = [
+            "private",
+            "public"
+        ];
 
-    const RoomType = ContentJSON.content.RoomType;
+        const RoomType = ContentJSON.content.RoomType;
 
-    if(!allowedRoomTypes.includes(RoomType))
-        return sendError(UserID, `Unknown room type: ${RoomType}.`);
+        if(!allowedRoomTypes.includes(RoomType))
+            return sendError(UserID, `Unknown room type: ${RoomType}.`);
 
-    const RoomID = generateRoomUUID();
+        const RoomID = generateRoomUUID();
 
-    members[UserID].In = RoomID;
-    rooms[RoomID] = {
-        currentMedia: ContentJSON.content.MediaName,
-        isPaused: ContentJSON.content.IsPaused,
-        host: UserID,
-        type: RoomType,
-        mods: [],
-        members: [UserID],
-        messages: {}
-    }
-
-    getSession(UserID).send(JSON.stringify({
-        type: "info",
-        content: {
-            RoomID
+        members[UserID].In = RoomID;
+        rooms[RoomID] = {
+            currentMedia: ContentJSON.content.MediaName,
+            isPaused: ContentJSON.content.IsPaused,
+            host: UserID,
+            type: RoomType,
+            mods: [],
+            members: [UserID],
+            messages: {}
         }
-    }));
 
-    broadcastToAdmins({ 
-        type: "userHost", 
-        content: {
-            RoomID,
-            MediaName: ContentJSON.content.MediaName,
-            IsPaused: ContentJSON.content.IsPaused,
-            Host: UserID
-        } 
-    });
-};
-
-const join = (UserID: string, ContentJSON: sendMessageTypes.join): void => {
-    if(!validateMessage(ContentJSON, { type: "test", content: { RoomID: "" } })) 
-        return sendError(UserID, `Invalid message format for ${ContentJSON.type}.`);
-
-    if(!rooms[ContentJSON.content.RoomID])
-        return sendError(UserID, `Unknown room ${ContentJSON.content.RoomID}.`);
-
-    const isInRoom: boolean = members[UserID].In !== "",
-        RoomID: string = ContentJSON.content.RoomID;
-
-    if(isInRoom) 
-        return sendError(UserID, `Member ${UserID} is already belong to a room.`);
-
-    rooms[RoomID].members.push(UserID);
-    members[UserID].In = RoomID;
-
-    const currentRoom = rooms[RoomID],
-        membersObj = {};
-
-    for(const memberID of currentRoom.members) {
-        membersObj[memberID] = {
-            UserName: members[memberID].UserName,
-            Avt: members[memberID].Avt
-        };
-    }
-
-    const toSend: { [Props: string]: any } = {
-        CurrentMedia: currentRoom.currentMedia,
-        IsPaused: currentRoom.isPaused,
-        Mods: currentRoom.mods,
-        Members: membersObj,
-        Messages: currentRoom.messages
-    };
-
-    if(rooms[RoomID].type === "private") 
-        toSend.RoomID = RoomID;
-
-    getSession(UserID).send(JSON.stringify({ type: "init", content: toSend }));
-
-    broadcastToRoom(RoomID, { 
-        type: "join", 
-        content: {
-            UserID,
-            UserName: members[UserID].UserName,
-            Avt: members[UserID].Avt
-        } 
-    }, UserID);
-
-    broadcastToAdmins({ 
-        type: "userJoin", 
-        content: {
-            UserID,
-            Target: RoomID
-        } 
-    });
-    print(`${UserID} joined a room.`, RoomID);
-};
-
-const leave = (UserID: string, ContentJSON: sendMessageTypes.leave): void => {
-    if(!validateMessage(ContentJSON, { type: "" }))
-        return sendError(UserID, `Invalid message format for ${ContentJSON.type}.`);
-
-    const RoomID: string = members[UserID].In;
-    if(!RoomID) 
-        return sendError(UserID, `Member ${UserID} does not belong to a room.`);
-
-    if(UserID === rooms[RoomID].host) {
-        broadcastToRoom(RoomID, { type: "end", content: undefined });
-
-        for(const MemberID of rooms[RoomID].members)
-            members[MemberID].In = "";
-
-        delete rooms[RoomID];
-        broadcastToAdmins({ type: "roomEnd", content: { RoomID } });
-        print(`${UserID} ended their room session.`, RoomID);
-    }
-    else {
-        rooms[RoomID].members.splice(rooms[RoomID].members.indexOf(UserID), 1);
-        broadcastToRoom(RoomID, { type: "leave", content: { MemberID: UserID } });
-        members[UserID].In = "";
-        broadcastToAdmins({
-            type: "memberLeave",
+        getSession(UserID).send(JSON.stringify({
+            type: "info",
             content: {
-                RoomID,
-                UserID
+                RoomID
             }
-        });
-        print(`${UserID} left.`, RoomID);
-    }
-};
-
-const message = (UserID: string, ContentJSON: sendMessageTypes.message): void => {
-    if(!validateMessage(ContentJSON, { type: "test", content: "test" })) 
-        return sendError(UserID, `Invalid message format for ${ContentJSON.type}.`);
-
-    const RoomID: string = members[UserID].In;
-    if(!members[UserID].In) 
-        return sendError(UserID, `Member ${UserID} does not belong to a room.`);
-
-    const MessageID: string = generateMessageUUID(RoomID),
-        MessageObject = {
-            Sender: UserID,
-            Text: ContentJSON.content.Text,
-            Timestamp: getCurrentTime()
-        };
-
-    rooms[RoomID].messages[MessageID] = MessageObject;
-
-    broadcastToRoom(RoomID, { 
-        type: "message", 
-        content: {
-            MessageID,
-            ...MessageObject
-        } 
-    });
-
-    print(`${UserID}: ${ContentJSON.content.Text}`, RoomID);
-};
-
-const election = (UserID: string, ContentJSON: sendMessageTypes.election): void => {
-    if(!validateMessage(ContentJSON, { type: "test", content: "test" }))
-        return sendError(UserID, `Invalid message format for ${ContentJSON.type}.`);
-
-    const RoomID = members[UserID].In;
-    if(!RoomID) 
-        return sendError(UserID, `Member ${UserID} does not belong to a room.`);
-    
-    const isMemberBelongToRoom = rooms[RoomID].members.includes(ContentJSON.content.MemberID),
-        isMemberAMod = rooms[RoomID].mods.includes(ContentJSON.content.MemberID),
-        doesMemberHasPermission = rooms[RoomID].host == UserID,
-        isEligibleForElection = isMemberBelongToRoom && !isMemberAMod && doesMemberHasPermission;
-
-    if(isEligibleForElection) {
-        rooms[RoomID].mods.push(ContentJSON.content.MemberID);
-
-        broadcastToRoom(RoomID, ContentJSON);
+        }));
 
         broadcastToAdmins({ 
-            type: "userElection", 
+            type: "userHost", 
             content: {
                 RoomID,
-                Target: ContentJSON.content.MemberID
-            }
+                MediaName: ContentJSON.content.MediaName,
+                IsPaused: ContentJSON.content.IsPaused,
+                Host: UserID
+            } 
         });
-        print(`${ContentJSON.content.MemberID} elected to moderator by the host.`, RoomID);
-    }
-    else if(!doesMemberHasPermission) 
-        sendError(UserID, "Insufficient permission.");
-    else if(isMemberAMod)
-        sendError(UserID, `Member ${ContentJSON.content.MemberID} is already a moderator.`);
-    else sendError(UserID, `Unknown member ${ContentJSON.content.MemberID}: Member does not exist or does not belong to this room.`);
-};
+    }, 
+    join = (UserID: string, ContentJSON: sendMessageTypes.join): void => {
+        if(!validateMessage(ContentJSON, { type: "test", content: { RoomID: "" } })) 
+            return sendError(UserID, `Invalid message format for ${ContentJSON.type}.`);
 
-const demotion = (UserID: string, ContentJSON: sendMessageTypes.demotion): void => {
-    if(!validateMessage(ContentJSON, { type: "test", content: "test" })) 
-        return sendError(UserID, `Invalid message format for ${ContentJSON.type}.`);
-    
-    const RoomID: string = members[UserID].In;
+        if(!rooms[ContentJSON.content.RoomID])
+            return sendError(UserID, `Unknown room ${ContentJSON.content.RoomID}.`);
 
-    if(!RoomID) 
-        return sendError(UserID, `Member ${UserID} does not belong to a room.`);
-        
-    const isMemberBelongToRoom: boolean = rooms[RoomID].members.includes(ContentJSON.content.MemberID),
-        isMemberAMod: boolean = rooms[RoomID].mods.includes(ContentJSON.content.MemberID),
-        doesMemberHasPermission: boolean = rooms[RoomID].host == UserID,
-        isEligibleForDemotion: boolean = isMemberBelongToRoom && isMemberAMod && doesMemberHasPermission;
+        const isInRoom: boolean = members[UserID].In !== "",
+            RoomID: string = ContentJSON.content.RoomID;
 
-    if(isEligibleForDemotion) {
-        rooms[RoomID].mods.splice(rooms[RoomID].mods.indexOf(ContentJSON.content.MemberID), 1);
+        if(isInRoom) 
+            return sendError(UserID, `Member ${UserID} is already belong to a room.`);
 
-        broadcastToRoom(RoomID, { type: "demotion", content: ContentJSON.content });
+        rooms[RoomID].members.push(UserID);
+        members[UserID].In = RoomID;
+
+        const currentRoom = rooms[RoomID],
+            membersObj = {};
+
+        for(const memberID of currentRoom.members) {
+            membersObj[memberID] = {
+                UserName: members[memberID].UserName,
+                Avt: members[memberID].Avt
+            };
+        }
+
+        const toSend: { [Props: string]: any } = {
+            CurrentMedia: currentRoom.currentMedia,
+            IsPaused: currentRoom.isPaused,
+            Mods: currentRoom.mods,
+            Members: membersObj,
+            Messages: currentRoom.messages
+        };
+
+        if(rooms[RoomID].type === "private") 
+            toSend.RoomID = RoomID;
+
+        getSession(UserID).send(JSON.stringify({ type: "init", content: toSend }));
+
+        broadcastToRoom(RoomID, { 
+            type: "join", 
+            content: {
+                UserID,
+                UserName: members[UserID].UserName,
+                Avt: members[UserID].Avt
+            } 
+        }, UserID);
 
         broadcastToAdmins({ 
-            type: "userDemotion", 
+            type: "userJoin", 
             content: {
-                RoomID,
-                Target: ContentJSON.content.MemberID
+                UserID,
+                Target: RoomID
+            } 
+        });
+        print(`${UserID} joined a room.`, RoomID);
+    }, 
+    leave = (UserID: string, ContentJSON: sendMessageTypes.leave): void => {
+        if(!validateMessage(ContentJSON, { type: "" }))
+            return sendError(UserID, `Invalid message format for ${ContentJSON.type}.`);
+
+        const RoomID: string = members[UserID].In;
+        if(!RoomID) 
+            return sendError(UserID, `Member ${UserID} does not belong to a room.`);
+
+        if(UserID === rooms[RoomID].host) {
+            broadcastToRoom(RoomID, { type: "end", content: undefined });
+
+            for(const MemberID of rooms[RoomID].members)
+                members[MemberID].In = "";
+
+            delete rooms[RoomID];
+            broadcastToAdmins({ type: "roomEnd", content: { RoomID } });
+            print(`${UserID} ended their room session.`, RoomID);
+        }
+        else {
+            rooms[RoomID].members.splice(rooms[RoomID].members.indexOf(UserID), 1);
+            broadcastToRoom(RoomID, { type: "leave", content: { MemberID: UserID } });
+            members[UserID].In = "";
+            broadcastToAdmins({
+                type: "memberLeave",
+                content: {
+                    RoomID,
+                    UserID
+                }
+            });
+            print(`${UserID} left.`, RoomID);
+        }
+    }, 
+    message = (UserID: string, ContentJSON: sendMessageTypes.message): void => {
+        if(!validateMessage(ContentJSON, { type: "test", content: "test" })) 
+            return sendError(UserID, `Invalid message format for ${ContentJSON.type}.`);
+
+        const RoomID: string = members[UserID].In;
+        if(!members[UserID].In) 
+            return sendError(UserID, `Member ${UserID} does not belong to a room.`);
+
+        const MessageID: string = generateMessageUUID(RoomID),
+            MessageObject = {
+                Sender: UserID,
+                Text: ContentJSON.content.Text,
+                Timestamp: getCurrentTime()
+            };
+
+        rooms[RoomID].messages[MessageID] = MessageObject;
+
+        broadcastToRoom(RoomID, { 
+            type: "message", 
+            content: {
+                MessageID,
+                ...MessageObject
             } 
         });
 
-        print(`${ContentJSON.content.MemberID} demoted by the host.`, RoomID);
-    }
-    else if(!doesMemberHasPermission) 
-        sendError(UserID, "Insufficient permission.");
-    else if(!isMemberAMod)
-        sendError(UserID, `Member ${ContentJSON.content.MemberID} is not a moderator.`);
-    else sendError(UserID, `Unknown member ${ContentJSON.content.MemberID}: Member does not exist or does not belong to this room.`);
-};
+        print(`${UserID}: ${ContentJSON.content.Text}`, RoomID);
+    }, 
+    election = (UserID: string, ContentJSON: sendMessageTypes.election): void => {
+        if(!validateMessage(ContentJSON, { type: "test", content: "test" }))
+            return sendError(UserID, `Invalid message format for ${ContentJSON.type}.`);
 
-const pause = (UserID: string, ContentJSON: sendMessageTypes.pause): void => {
-    if(!validateMessage(ContentJSON, { type: "test", content: { IsPaused: false } }))
-        return sendError(UserID, `Invalid message format for ${ContentJSON.type}.`);
+        const RoomID = members[UserID].In;
+        if(!RoomID) 
+            return sendError(UserID, `Member ${UserID} does not belong to a room.`);
+        
+        const isMemberBelongToRoom = rooms[RoomID].members.includes(ContentJSON.content.MemberID),
+            isMemberAMod = rooms[RoomID].mods.includes(ContentJSON.content.MemberID),
+            doesMemberHasPermission = rooms[RoomID].host == UserID,
+            isEligibleForElection = isMemberBelongToRoom && !isMemberAMod && doesMemberHasPermission;
 
-    const RoomID: string = members[UserID].In;
-    if(!RoomID)
-        return sendError(UserID, "Not currently in a room.");
+        if(isEligibleForElection) {
+            rooms[RoomID].mods.push(ContentJSON.content.MemberID);
 
-    if(UserID !== rooms[RoomID].host && rooms[RoomID].type === "public") 
-        return sendError(UserID, "Insufficient permission.");
+            broadcastToRoom(RoomID, ContentJSON);
 
-    rooms[RoomID].isPaused = ContentJSON.content.IsPaused;
-    broadcastToRoom(RoomID, ContentJSON);
-    print(`${UserID} paused.`, RoomID);
-};
-
-const sync = (UserID: string, ContentJSON: sendMessageTypes.sync): void => {
-    if(!validateMessage(ContentJSON, { type: "test", content: { Timestamp: 1234 } }))
-        return sendError(UserID, `Invalid message format for ${ContentJSON.type}.`);
-
-    const RoomID: string = members[UserID].In;
-    if(!RoomID)
-        return sendError(UserID, `Member ${UserID} does not belong to a room.`);
-
-    if(UserID !== rooms[RoomID].host && rooms[RoomID].type === "public") 
-        return sendError(UserID, "Insufficient permission.");
-
-    broadcastToRoom(RoomID, ContentJSON);
-    print(`${UserID} skipped to ${ContentJSON.content.Timestamp}`, RoomID);
-};
-
-const upload = (UserID: string, ContentJSON: sendMessageTypes.upload): void => {
-
-};
-
-const adminLogin = (AdminID: string, ContentJSON: adminSendMessageTypes.adminLogin): void => {
-    if(!validateMessage(ContentJSON, { type: "test", content: { Password: "string" } })) 
-        return sendError(AdminID, `Invalid message format for ${ContentJSON.type}.`);
-
-    if(adminIDs.includes(AdminID)) 
-        return sendError(AdminID, "Already logged in as an admin.");
-
-    if(members[AdminID].AdminLoginAttempts > config.MaxAdminLoginAttempts) 
-        return sendError(AdminID, "Exceeded the login attempt count, cannot continue.");
-
-    if(ContentJSON.content.Password !== config.PanelPassword) {
-        members[AdminID].AdminLoginAttempts += 1;
-        return sendError(AdminID, "Incorrect admin password, please try again.");
-    }
-    
-    members[AdminID].AdminLoginAttempts = 0;
-    adminIDs.push(AdminID);
-    const membersObj: { [MemberID: string]: { UserName: string, Avt: string } } = {};
-
-    for(const memberID in members) {
-        membersObj[memberID] = {
-            UserName: members[memberID].UserName,
-            Avt: members[memberID].Avt
-        };
-    }
-
-    getSession(AdminID).send(JSON.stringify({
-        type: "adminInit", 
-        content: {
-            Logs: logs.join("\n"),
-            Rooms: rooms,
-            Members: membersObj
+            broadcastToAdmins({ 
+                type: "userElection", 
+                content: {
+                    RoomID,
+                    Target: ContentJSON.content.MemberID
+                }
+            });
+            print(`${ContentJSON.content.MemberID} elected to moderator by the host.`, RoomID);
         }
-    }));
-}; 
+        else if(!doesMemberHasPermission) 
+            sendError(UserID, "Insufficient permission.");
+        else if(isMemberAMod)
+            sendError(UserID, `Member ${ContentJSON.content.MemberID} is already a moderator.`);
+        else sendError(UserID, `Unknown member ${ContentJSON.content.MemberID}: Member does not exist or does not belong to this room.`);
+    }, 
+    demotion = (UserID: string, ContentJSON: sendMessageTypes.demotion): void => {
+        if(!validateMessage(ContentJSON, { type: "test", content: "test" })) 
+            return sendError(UserID, `Invalid message format for ${ContentJSON.type}.`);
+        
+        const RoomID: string = members[UserID].In;
 
-const adminLogout = (AdminID: string, ContentJSON: adminSendMessageTypes.adminLogout): void => {
-    if(!validateMessage(ContentJSON, { type: "adminLogout" })) 
-        return sendError(AdminID, `Invalid message format for ${ContentJSON.type}.`);
+        if(!RoomID) 
+            return sendError(UserID, `Member ${UserID} does not belong to a room.`);
+            
+        const isMemberBelongToRoom: boolean = rooms[RoomID].members.includes(ContentJSON.content.MemberID),
+            isMemberAMod: boolean = rooms[RoomID].mods.includes(ContentJSON.content.MemberID),
+            doesMemberHasPermission: boolean = rooms[RoomID].host == UserID,
+            isEligibleForDemotion: boolean = isMemberBelongToRoom && isMemberAMod && doesMemberHasPermission;
 
-    if(!adminIDs.includes(AdminID)) 
-        return sendError(AdminID, "Not logged in as an admin.");
+        if(isEligibleForDemotion) {
+            rooms[RoomID].mods.splice(rooms[RoomID].mods.indexOf(ContentJSON.content.MemberID), 1);
 
-    adminIDs.splice(adminIDs.indexOf(AdminID), 1);
-};
+            broadcastToRoom(RoomID, { type: "demotion", content: ContentJSON.content });
 
-const shutdown = (AdminID: string, ContentJSON: adminSendMessageTypes.shutdown): void => {
-    if(!validateMessage(ContentJSON, { type: "shutdown" }))
-        return sendError(AdminID, `Invalid message format for ${ContentJSON.type}.`);
+            broadcastToAdmins({ 
+                type: "userDemotion", 
+                content: {
+                    RoomID,
+                    Target: ContentJSON.content.MemberID
+                } 
+            });
 
-    if(!adminIDs.includes(AdminID)) 
-        return sendError(AdminID, "Insufficient permission.");
-
-    close();
-};
-
-const broadcastToRoom = (RoomID: string, ContentJSON: SendMessageTypes, ...except: string[]): void => {
-    if(!rooms[RoomID])
-        return;
-
-    for(const UserID of rooms[RoomID].members) {
-        const member = members[UserID];
-        const session: ws.WebSocket = getSession(UserID);
-        if(member && session && session.readyState === ws.WebSocket.OPEN && !except.includes(UserID)) {
-            session.send(JSON.stringify(ContentJSON));
+            print(`${ContentJSON.content.MemberID} demoted by the host.`, RoomID);
         }
-    }
-};
+        else if(!doesMemberHasPermission) 
+            sendError(UserID, "Insufficient permission.");
+        else if(!isMemberAMod)
+            sendError(UserID, `Member ${ContentJSON.content.MemberID} is not a moderator.`);
+        else sendError(UserID, `Unknown member ${ContentJSON.content.MemberID}: Member does not exist or does not belong to this room.`);
+    }, 
+    pause = (UserID: string, ContentJSON: sendMessageTypes.pause): void => {
+        if(!validateMessage(ContentJSON, { type: "test", content: { IsPaused: false } }))
+            return sendError(UserID, `Invalid message format for ${ContentJSON.type}.`);
 
-const close = (): void => {
-    wss.clients.forEach((client: ws.WebSocket): void => {
-        try {
-            client.close();
+        const RoomID: string = members[UserID].In;
+        if(!RoomID)
+            return sendError(UserID, "Not currently in a room.");
+
+        if(UserID !== rooms[RoomID].host && rooms[RoomID].type === "public") 
+            return sendError(UserID, "Insufficient permission.");
+
+        rooms[RoomID].isPaused = ContentJSON.content.IsPaused;
+        broadcastToRoom(RoomID, ContentJSON);
+        print(`${UserID} paused.`, RoomID);
+    }, 
+    sync = (UserID: string, ContentJSON: sendMessageTypes.sync): void => {
+        if(!validateMessage(ContentJSON, { type: "test", content: { Timestamp: 1234 } }))
+            return sendError(UserID, `Invalid message format for ${ContentJSON.type}.`);
+
+        const RoomID: string = members[UserID].In;
+        if(!RoomID)
+            return sendError(UserID, `Member ${UserID} does not belong to a room.`);
+
+        if(UserID !== rooms[RoomID].host && rooms[RoomID].type === "public") 
+            return sendError(UserID, "Insufficient permission.");
+
+        broadcastToRoom(RoomID, ContentJSON);
+        print(`${UserID} skipped to ${ContentJSON.content.Timestamp}`, RoomID);
+    }, 
+    upload = (UserID: string, ContentJSON: sendMessageTypes.upload): void => {
+
+    }, 
+    adminLogin = (AdminID: string, ContentJSON: adminSendMessageTypes.adminLogin): void => {
+        if(!validateMessage(ContentJSON, { type: "test", content: { Password: "string" } })) 
+            return sendError(AdminID, `Invalid message format for ${ContentJSON.type}.`);
+
+        if(adminIDs.includes(AdminID)) 
+            return sendError(AdminID, "Already logged in as an admin.");
+
+        if(members[AdminID].AdminLoginAttempts > config.MaxAdminLoginAttempts) 
+            return sendError(AdminID, "Exceeded the login attempt count, cannot continue.");
+
+        if(ContentJSON.content.Password !== config.PanelPassword) {
+            members[AdminID].AdminLoginAttempts += 1;
+            return sendError(AdminID, "Incorrect admin password, please try again.");
         }
-        catch {
-            client.terminate();
+        
+        members[AdminID].AdminLoginAttempts = 0;
+        adminIDs.push(AdminID);
+        const membersObj: { [MemberID: string]: { UserName: string, Avt: string } } = {};
+
+        for(const memberID in members) {
+            membersObj[memberID] = {
+                UserName: members[memberID].UserName,
+                Avt: members[memberID].Avt
+            };
         }
-    });
 
-    server.close(async (): Promise<void> => await fs.writeFile(path.join("logs", generateLogsUUID()), logs.join("\n"), { encoding: "utf-8" }));
-    process.exit(0);
-};
+        getSession(AdminID).send(JSON.stringify({
+            type: "adminInit", 
+            content: {
+                Logs: logs.join("\n"),
+                Rooms: rooms,
+                Members: membersObj
+            }
+        }));
+    }, 
+    adminLogout = (AdminID: string, ContentJSON: adminSendMessageTypes.adminLogout): void => {
+        if(!validateMessage(ContentJSON, { type: "adminLogout" })) 
+            return sendError(AdminID, `Invalid message format for ${ContentJSON.type}.`);
 
-const sendError = (UserID: string, Message: string): void => getSession(UserID).send(JSON.stringify({
-    type: "error",
-    content: { Message }
-}));
+        if(!adminIDs.includes(AdminID)) 
+            return sendError(AdminID, "Not logged in as an admin.");
 
-const getSession = (UserID: string): ws.WebSocket => members[UserID].Socket;
+        adminIDs.splice(adminIDs.indexOf(AdminID), 1);
+    }, 
+    shutdown = (AdminID: string, ContentJSON: adminSendMessageTypes.shutdown): void => {
+        if(!validateMessage(ContentJSON, { type: "shutdown" }))
+            return sendError(AdminID, `Invalid message format for ${ContentJSON.type}.`);
 
-const broadcastToAdmins = (ContentJSON: AdminSendMessageTypes): void => {
-    for(const admin of adminIDs) {
-        getSession(admin).send(JSON.stringify(ContentJSON));
-    }
-};
+        if(!adminIDs.includes(AdminID)) 
+            return sendError(AdminID, "Insufficient permission.");
 
-const generateRoomUUID = (): string => {
-    let UUID: string;
+        close();
+    }, 
+    broadcastToRoom = (RoomID: string, ContentJSON: SendMessageTypes, ...except: string[]): void => {
+        if(!rooms[RoomID])
+            return;
 
-    do {
-        UUID = crypto.randomUUID();
-    } while(rooms[UUID]);
+        for(const UserID of rooms[RoomID].members) {
+            const member = members[UserID];
+            const session: ws.WebSocket = getSession(UserID);
+            if(member && session && session.readyState === ws.WebSocket.OPEN && !except.includes(UserID)) {
+                session.send(JSON.stringify(ContentJSON));
+            }
+        }
+    }, 
+    close = (): void => {
+        wss.clients.forEach((client: ws.WebSocket): void => {
+            try {
+                client.close();
+            }
+            catch {
+                client.terminate();
+            }
+        });
 
-    return UUID;
-};
+        server.close(async (): Promise<void> => await fs.writeFile(path.join("logs", generateLogsUUID()), logs.join("\n"), { encoding: "utf-8" }));
+        process.exit(0);
+    }, 
+    sendError = (UserID: string, Message: string): void => getSession(UserID).send(JSON.stringify({
+        type: "error",
+        content: { Message }
+    })), 
+    getSession = (UserID: string): ws.WebSocket => members[UserID].Socket,
+    broadcastToAdmins = (ContentJSON: AdminSendMessageTypes): void => {
+        for(const admin of adminIDs) {
+            getSession(admin).send(JSON.stringify(ContentJSON));
+        }
+    }, 
+    generateRoomUUID = (): string => {
+        let UUID: string;
 
-const generateMessageUUID = (RoomID: string): string => {
-    let UUID: string;
+        do {
+            UUID = crypto.randomUUID();
+        } while(rooms[UUID]);
 
-    do {
-        UUID = crypto.randomUUID();
-    } while(rooms[RoomID].messages[UUID]);
+        return UUID;
+    }, 
+    generateMessageUUID = (RoomID: string): string => {
+        let UUID: string;
 
-    return UUID;
-};
+        do {
+            UUID = crypto.randomUUID();
+        } while(rooms[RoomID].messages[UUID]);
 
-const generateLogsUUID = (): string => {
-    let UUID: string;
-    
-    do {
-        UUID = crypto.randomUUID();
-    } while(existsSync(path.join("logs", `${UUID}.log`)));
+        return UUID;
+    }, 
+    generateLogsUUID = (): string => {
+        let UUID: string;
+        
+        do {
+            UUID = crypto.randomUUID();
+        } while(existsSync(path.join("logs", `${UUID}.log`)));
 
-    return UUID;
-};
+        return UUID;
+    }, 
+    generateUserUUID = (): string => {
+        let UUID: string;
+        
+        do {
+            UUID = crypto.randomUUID();
+        } while(members[UUID]);
 
-const generateUserUUID = (): string => {
-    let UUID: string;
-    
-    do {
-        UUID = crypto.randomUUID();
-    } while(members[UUID]);
+        return UUID;
+    };
 
-    return UUID;
-};
+server.on("error", close);
+process.on("SIGTERM", close);
+process.on("SIGINT", close);
+process.on("SIGHUP", close);
+process.on("uncaughtException", close);
+process.on("unhandledRejection", close);
 
 server.listen(config.PORT, () => {
     console.log(`Hello World! Server's running at port ${config.PORT}.`);

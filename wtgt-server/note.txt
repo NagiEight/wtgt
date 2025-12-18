@@ -1,2 +1,0 @@
-send = client-to-server
-receive = server-to-client
