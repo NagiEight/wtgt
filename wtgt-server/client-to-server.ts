@@ -15,7 +15,7 @@ export interface join {
 }
 
 export interface message {
-    type: "message";
+    type: "message";    
     content: {
         Text: string;
     };

@@ -11,7 +11,6 @@ import { existsSync } from "fs";
 import validateMessage from "./validateMessage.js";
 import getCurrentTime from "./getCurrentTime.js";
 import generatePassword from "./generatePassword.js";
-import resolveBadFileName from "./resolveFileName.js";
 
 import * as sendMessageTypes from "./client-to-server.js";
 import * as adminSendMessageTypes from "./admin-to-server.js";
@@ -216,7 +215,7 @@ wss.on("connection", (client: ws.WebSocket, req: http.IncomingMessage): void => 
     });
 });
 
-const host = (UserID: string, ContentJSON: sendMessageTypes.host) => {
+const host = (UserID: string, ContentJSON: sendMessageTypes.host): void => {
     if(!validateMessage(ContentJSON, { type: "test", content: { MediaName: "test", RoomType: "test", IsPaused: true }})) 
         return sendError(UserID, `Invalid message format for ${ContentJSON.type}.`);
 
@@ -265,7 +264,7 @@ const host = (UserID: string, ContentJSON: sendMessageTypes.host) => {
     });
 };
 
-const join = (UserID: string, ContentJSON: sendMessageTypes.join) => {
+const join = (UserID: string, ContentJSON: sendMessageTypes.join): void => {
     if(!validateMessage(ContentJSON, { type: "test", content: { RoomID: "" } })) 
         return sendError(UserID, `Invalid message format for ${ContentJSON.type}.`);
 
@@ -323,7 +322,7 @@ const join = (UserID: string, ContentJSON: sendMessageTypes.join) => {
     print(`${UserID} joined a room.`, RoomID);
 };
 
-const leave = (UserID: string, ContentJSON: sendMessageTypes.leave) => {
+const leave = (UserID: string, ContentJSON: sendMessageTypes.leave): void => {
     if(!validateMessage(ContentJSON, { type: "" }))
         return sendError(UserID, `Invalid message format for ${ContentJSON.type}.`);
 
@@ -356,7 +355,7 @@ const leave = (UserID: string, ContentJSON: sendMessageTypes.leave) => {
     }
 };
 
-const message = (UserID: string, ContentJSON: sendMessageTypes.message) => {
+const message = (UserID: string, ContentJSON: sendMessageTypes.message): void => {
     if(!validateMessage(ContentJSON, { type: "test", content: "test" })) 
         return sendError(UserID, `Invalid message format for ${ContentJSON.type}.`);
 
@@ -438,7 +437,8 @@ const demotion = (UserID: string, ContentJSON: sendMessageTypes.demotion): void 
         broadcastToRoom(RoomID, { type: "demotion", content: ContentJSON.content });
 
         broadcastToAdmins({ 
-            type: "userDemotion", content: {
+            type: "userDemotion", 
+            content: {
                 RoomID,
                 Target: ContentJSON.content.MemberID
             } 
@@ -484,7 +484,7 @@ const sync = (UserID: string, ContentJSON: sendMessageTypes.sync): void => {
     print(`${UserID} skipped to ${ContentJSON.content.Timestamp}`, RoomID);
 };
 
-const upload = (UserID: string, ContentJSON: sendMessageTypes.upload) => {
+const upload = (UserID: string, ContentJSON: sendMessageTypes.upload): void => {
 
 };
 
@@ -578,7 +578,7 @@ const sendError = (UserID: string, Message: string): void => getSession(UserID).
 
 const getSession = (UserID: string): ws.WebSocket => members[UserID].Socket;
 
-const broadcastToAdmins = (ContentJSON: AdminSendMessageTypes) => {
+const broadcastToAdmins = (ContentJSON: AdminSendMessageTypes): void => {
     for(const admin of adminIDs) {
         getSession(admin).send(JSON.stringify(ContentJSON));
     }
