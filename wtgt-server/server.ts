@@ -3,6 +3,7 @@ import http from "http";
 import fs from "fs/promises";
 import path from "path";
 import crypto from "crypto";
+import util from "util";
 
 import * as ws from "ws";
 
@@ -52,7 +53,20 @@ interface Config {
     PanelPassword: string;
     RegeneratePassword: boolean;
     PasswordRegenerationInterval: number;
+    ServerTerminalFlushing: boolean;
+    FlushingInterval: number;
+    BucketCapacity: number;
+    BucketRefillInterval: number;
 }
+
+interface Bucket {
+    [IP: string]: {
+        Tokens: number;
+        LastRefill: number;
+    }
+}
+
+type Router = (urlParts: string[], url: URL) => Promise<string | null>;
 
 type ContentJSONType = 
     | sendMessageTypes.host 
@@ -93,11 +107,148 @@ type AdminSendMessageTypes =
     | adminReceiveMessageTypes.connection;
 
 const print = (string: string, RoomID?: string): void => {
-    console.log(`[${getCurrentTime()}]${RoomID ? `{${RoomID}}` : ""} ${string}`);
-    logs.push(`[${getCurrentTime()}] ${string}`);
+    console.log(`${util.styleText("yellowBright", `[${getCurrentTime()}]`)}${RoomID ? `${util.styleText("greenBright", `{${RoomID}}`)}` : ""} ${string}`);
+    logs.push(`[${getCurrentTime()}]${RoomID ? `{${RoomID}}` : ""} ${string}`);
 };
 
-const server: http.Server<typeof http.IncomingMessage, typeof http.ServerResponse> = http.createServer((req: http.IncomingMessage, res: http.ServerResponse) => {}),
+const Routers: Router[] = [
+        async (parts: string[], url: URL): Promise<string | null> => {
+            if(parts[1] !== "admin" || parts[2] !== "panel")
+                return null;
+            if(url.searchParams.get("p") !== config.PanelPassword)
+                return "403";
+            if(parts.length === 4)
+                return path.join("admin", "panel", "panel.html");
+            if(parts.length === 5)
+                return path.join("admin", "panel", path.basename(url.pathname));
+            return null;
+        },
+        async (parts: string[], url: URL): Promise<string | null> => {
+            if(parts[1] !== "admin")
+                return null;
+            if(parts.length === 3)
+                return path.join("admin", "login.html");
+            if(parts.length === 4)
+                return path.join("admin", path.basename(url.pathname));
+            return null;
+        },
+        async (parts: string[], url: URL): Promise<string | null> => {
+            if(parts[1] !== "watch")
+                return null;
+            if(parts.length === 3)
+                return path.join("public", "watch", "watch.html");
+            if(parts.length === 4)
+                return path.join("public", "watch", path.basename(url.pathname));
+            return null;
+        },
+        async (parts: string[], url: URL): Promise<string | null> => {
+            if(parts.length === 2)
+                return path.join("public", "index.html");
+            if(parts.length === 3)
+                return path.join("public", path.basename(url.pathname));
+            return null;
+        }
+    ],
+    buckets: Bucket = {},
+    hoursToMs = (time: number): number => time * 3600000,
+    allowRequest = (IP: string): boolean => {
+        const refillRate = config.BucketCapacity / hoursToMs(config.BucketRefillInterval);
+
+        const now: number = Date.now();
+        let bucket = buckets[IP];
+        if(!bucket) {
+            bucket = { Tokens: config.BucketCapacity, LastRefill: now };
+            buckets[IP] = bucket;
+        }
+
+        const elapsed: number = now - bucket.LastRefill;
+        bucket.Tokens = Math.min(config.BucketCapacity, bucket.Tokens + elapsed * refillRate);
+        bucket.LastRefill = now;
+
+        if(bucket.Tokens < 1)
+            return false;
+
+        bucket.Tokens -= 1;
+        return true;
+    },
+    getIPs = (req: http.IncomingMessage): string[] => [...(
+            Array.isArray(req.headers["x-forwarded-for"]) ? 
+            req.headers["x-forwarded-for"] : 
+            (req.headers["x-forwarded-for"] || "").replace(/ /g, "").split(",").filter(Boolean)
+        ),
+        req.socket.remoteAddress
+    ],
+    serverInternals = async (req: http.IncomingMessage, res: http.ServerResponse): Promise<void> => {
+        const addresses: string[] = getIPs(req);
+        for(const address of addresses) {
+            if(!allowRequest(address)) {
+                res.writeHead(429, { "content-type": "text/plain" });
+                res.end("429 Too Many Requests: Rate limit exceeded.");
+                return;
+            }
+        }
+
+        if(req.method.toUpperCase() === "GET") {
+            /**
+             * / -> public/index.html
+             * /file.ext/ -> public/file.ext
+             * 
+             * /watch/ -> public/watch/watch.html
+             * /watch/file.ext/ -> public/watch/file.ext
+             * 
+             * /admin/ -> admin/login.html
+             * /admin/file.ext/ -> admin/file.ext
+             * 
+             * /admin/panel/ -> admin/panel/panel.html
+             * /admin/panel/file.ext -> admin/panel/file.ext
+             */
+            const tempUrl: string = "https://temp.com",
+            fullTempUrl: URL = new URL(tempUrl + req.url),
+            staticExtensions: { [Ext: string]: string } = {
+                ".js": "application/javascript",
+                ".png": "image/png",
+                ".jpg": "image/jpeg",
+                ".svg": "image/svg+xml",
+                ".css": "text/css",
+                ".html": "text/html"
+            };
+            fullTempUrl.pathname = (fullTempUrl.pathname + "/").replace(/\/+/g, "/");
+            const urlParts: string[] = decodeURI(fullTempUrl.pathname)
+                .split("/")
+                .filter((value: string): boolean => !(value.length > 0 && /^[.]+$/.test(value)))
+                .map((part: string): string => part.replace(/ /g, "_"));
+            
+            let filePath: string | null = null;
+
+            for(const Router of Routers) {
+                const result: string | null = await Router(urlParts, fullTempUrl);
+                if(!result) 
+                    continue;
+                if(result === "403") {
+                    res.writeHead(403, { "content-type": "text/plain" });
+                    res.end("403 Forbidden: Accessing admin features requires the server's panel password attached as query parameter.");
+                    return;
+                }
+                filePath = result;
+                break;
+            }
+            if(filePath && existsSync(filePath)) {
+                const ext: string = path.extname(filePath);
+                res.writeHead(200, { "content-type": staticExtensions[ext] });
+                res.end(await fs.readFile(filePath));
+            }
+            else {
+                res.writeHead(404, { "content-type": "text/plain" });
+                res.end(`404 Not Found: Cannot resolve ${fullTempUrl.pathname}, try again.`);
+            }
+
+        }
+        else {
+            res.writeHead(501, { "content-type": "text/plain" });
+            res.end("501 Not Implemented.");
+        }
+    },
+    server: http.Server<typeof http.IncomingMessage, typeof http.ServerResponse> = http.createServer(serverInternals),
     wss: ws.WebSocketServer = new ws.WebSocketServer({ server }),
     rooms: RoomsObj = {},
     members: MembersObj = {},
@@ -109,7 +260,11 @@ const server: http.Server<typeof http.IncomingMessage, typeof http.ServerRespons
         PORT: 3000,
         PanelPassword: "",
         RegeneratePassword: true,
-        PasswordRegenerationInterval: 12
+        PasswordRegenerationInterval: 12,
+        ServerTerminalFlushing: true,
+        FlushingInterval: 12,
+        BucketCapacity: 2500,
+        BucketRefillInterval: 1
     },
     config: Config = await (async (): Promise<Config> => {
         const propertiesPath: string = "./server-properties";
@@ -163,6 +318,17 @@ wss.on("connection", (client: ws.WebSocket, req: http.IncomingMessage): void => 
     });
 
     client.on("message", (data: ws.RawData): void => {
+        if(!adminIDs.includes(UserID)) {
+            const addresses: string[] = getIPs(req);
+
+            for(const address of addresses) {
+                if(!allowRequest(address)) {
+                    sendError(UserID, "Rate limit exceeded.");
+                    return;
+                }
+            }
+        }
+
         let ContentJSON: ContentJSONType;
         try {
             ContentJSON = JSON.parse(data.toString());
@@ -554,9 +720,13 @@ const host = (UserID: string, ContentJSON: sendMessageTypes.host): void => {
             }
         });
 
-        server.close(async (): Promise<void> => await fs.writeFile(path.join("logs", generateLogsUUID()), logs.join("\n"), { encoding: "utf-8" }));
+        server.close(writeLog);
         process.exit(0);
     }, 
+    writeLog = async (): Promise<void> => { 
+        await fs.writeFile(path.join("logs", generateLogsUUID()), logs.join("\n"), { encoding: "utf-8" });
+        logs.length = 0;
+    },
     sendError = (UserID: string, Message: string): void => getSession(UserID).send(JSON.stringify({
         type: "error",
         content: { Message }
@@ -613,11 +783,18 @@ process.on("unhandledRejection", close);
 
 server.listen(config.PORT, () => {
     console.log(`Hello World! Server's running at port ${config.PORT}.`);
-    const hoursToMs = (time: number): number => time * 3600000;
     if(config.RegeneratePassword) {
         setInterval(async () => {
             config.PanelPassword = generatePassword(config.AdminPasswordLength, config.PanelPassword);
             await fs.writeFile(path.join("./server-properties", "config.json"), JSON.stringify(config, null, 4), { encoding: "utf-8" });
+            print(`Password resetted. Current Admin panel password is: ${config.PanelPassword}`);
         }, hoursToMs(config.PasswordRegenerationInterval));
+    }
+    if(config.ServerTerminalFlushing) {
+        setInterval(async () => {
+            await writeLog();
+            console.clear();
+            print(`Current Admin panel password is: ${config.PanelPassword}`);
+        }, hoursToMs(config.FlushingInterval));
     }
 });
