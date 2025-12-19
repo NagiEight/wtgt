@@ -123,31 +123,12 @@ const Routers: Router[] = [
                 return path.join("admin", "panel", path.basename(url.pathname));
             return null;
         },
-        async (parts: string[], url: URL): Promise<string | null> => {
-            if(parts[1] !== "admin")
-                return null;
-            if(parts.length === 3)
-                return path.join("admin", "login.html");
-            if(parts.length === 4)
-                return path.join("admin", path.basename(url.pathname));
-            return null;
-        },
-        async (parts: string[], url: URL): Promise<string | null> => {
-            if(parts[1] !== "watch")
-                return null;
-            if(parts.length === 3)
-                return path.join("public", "watch", "watch.html");
-            if(parts.length === 4)
-                return path.join("public", "watch", path.basename(url.pathname));
-            return null;
-        },
-        async (parts: string[], url: URL): Promise<string | null> => {
-            if(parts.length === 2)
-                return path.join("public", "index.html");
-            if(parts.length === 3)
-                return path.join("public", path.basename(url.pathname));
-            return null;
-        }
+        async (parts: string[], url: URL): Promise<string | null> => parts[1] === "admin" && parts.length === 4 && path.join("admin", path.basename(url.pathname)),
+        async (parts: string[]): Promise<string | null> => parts[1] === "admin" && parts.length === 3 && path.join("admin", "login.html"),
+        async (parts: string[], url: URL): Promise<string | null> => parts[1] === "watch" && parts.length === 4 && path.join("public", "watch", path.basename(url.pathname)),
+        async (parts: string[]): Promise<string | null> => parts[1] === "watch" && parts.length === 3 && path.join("public", "watch", "watch.html"),
+        async (parts: string[], url: URL): Promise<string | null> => parts.length === 3 && path.join("public", path.basename(url.pathname)),
+        async (parts: string[]): Promise<string | null> => parts.length === 2 && path.join("public", "index.html")
     ],
     buckets: Bucket = {},
     hoursToMs = (time: number): number => time * 3600000,
@@ -188,22 +169,25 @@ const Routers: Router[] = [
             }
         }
 
-        if(req.method.toUpperCase() === "GET") {
-            /**
-             * / -> public/index.html
-             * /file.ext/ -> public/file.ext
-             * 
-             * /watch/ -> public/watch/watch.html
-             * /watch/file.ext/ -> public/watch/file.ext
-             * 
-             * /admin/ -> admin/login.html
-             * /admin/file.ext/ -> admin/file.ext
-             * 
-             * /admin/panel/ -> admin/panel/panel.html
-             * /admin/panel/file.ext -> admin/panel/file.ext
-             */
-            const tempUrl: string = "https://temp.com",
-            fullTempUrl: URL = new URL(tempUrl + req.url),
+        if(req.method.toUpperCase() !== "GET") {
+            res.writeHead(501, { "content-type": "text/plain" });
+            res.end("501 Not Implemented.");
+            return;
+        }
+        /**
+         * / -> public/index.html
+         * /file.ext/ -> public/file.ext
+         * 
+         * /watch/ -> public/watch/watch.html
+         * /watch/file.ext/ -> public/watch/file.ext
+         * 
+         * /admin/ -> admin/login.html
+         * /admin/file.ext/ -> admin/file.ext
+         * 
+         * /admin/panel/ -> admin/panel/panel.html
+         * /admin/panel/file.ext/ -> admin/panel/file.ext
+         */
+        const fullUrl: URL = new URL(req.headers.host + req.url),
             staticExtensions: { [Ext: string]: string } = {
                 ".js": "application/javascript",
                 ".png": "image/png",
@@ -212,40 +196,34 @@ const Routers: Router[] = [
                 ".css": "text/css",
                 ".html": "text/html"
             };
-            fullTempUrl.pathname = (fullTempUrl.pathname + "/").replace(/\/+/g, "/");
-            const urlParts: string[] = decodeURI(fullTempUrl.pathname)
-                .split("/")
-                .filter((value: string): boolean => !(value.length > 0 && /^[.]+$/.test(value)))
-                .map((part: string): string => part.replace(/ /g, "_"));
-            
-            let filePath: string | null = null;
+        fullUrl.pathname = (fullUrl.pathname + "/").replace(/\/+/g, "/");
+        const urlParts: string[] = decodeURI(fullUrl.pathname)
+            .split("/")
+            .filter((value: string): boolean => !(value.length > 0 && /^[.]+$/.test(value)))
+            .map((part: string): string => part.replace(/ /g, "_"));
+        
+        let filePath: string | null = null;
 
-            for(const Router of Routers) {
-                const result: string | null = await Router(urlParts, fullTempUrl);
-                if(!result) 
-                    continue;
-                if(result === "403") {
-                    res.writeHead(403, { "content-type": "text/plain" });
-                    res.end("403 Forbidden: Accessing admin features requires the server's panel password attached as query parameter.");
-                    return;
-                }
-                filePath = result;
-                break;
+        for(const Router of Routers) {
+            const result: string | null = await Router(urlParts, fullUrl);
+            if(!result) 
+                continue;
+            if(result === "403") {
+                res.writeHead(403, { "content-type": "text/plain" });
+                res.end("403 Forbidden: Accessing admin features requires the server's panel password attached as query parameter.");
+                return;
             }
-            if(filePath && existsSync(filePath)) {
-                const ext: string = path.extname(filePath);
-                res.writeHead(200, { "content-type": staticExtensions[ext] });
-                res.end(await fs.readFile(filePath));
-            }
-            else {
-                res.writeHead(404, { "content-type": "text/plain" });
-                res.end(`404 Not Found: Cannot resolve ${fullTempUrl.pathname}, try again.`);
-            }
-
+            filePath = result;
+            break;
+        }
+        if(filePath && existsSync(filePath)) {
+            const ext: string = path.extname(filePath);
+            res.writeHead(200, { "content-type": staticExtensions[ext] });
+            res.end(await fs.readFile(filePath));
         }
         else {
-            res.writeHead(501, { "content-type": "text/plain" });
-            res.end("501 Not Implemented.");
+            res.writeHead(404, { "content-type": "text/plain" });
+            res.end(`404 Not Found: Cannot resolve ${fullUrl.pathname}, try again.`);
         }
     },
     server: http.Server<typeof http.IncomingMessage, typeof http.ServerResponse> = http.createServer(serverInternals),
@@ -385,28 +363,28 @@ const host = (UserID: string, ContentJSON: sendMessageTypes.host): void => {
         if(!validateMessage(ContentJSON, { type: "test", content: { MediaName: "test", RoomType: "test", IsPaused: true }})) 
             return sendError(UserID, `Invalid message format for ${ContentJSON.type}.`);
 
-        const isInRoom = members[UserID].In !== "";
+        const isInRoom: boolean = members[UserID].In !== "";
         if(isInRoom) 
             return sendError(UserID, `Member ${UserID} is already belong to a room.`);
 
-        const allowedRoomTypes = [
+        const allowedRoomTypes: string[] = [
             "private",
             "public"
         ];
 
-        const RoomType = ContentJSON.content.RoomType;
+        const RoomType: string = ContentJSON.content.RoomType;
 
         if(!allowedRoomTypes.includes(RoomType))
             return sendError(UserID, `Unknown room type: ${RoomType}.`);
 
-        const RoomID = generateRoomUUID();
+        const RoomID: string = generateRoomUUID();
 
         members[UserID].In = RoomID;
         rooms[RoomID] = {
             currentMedia: ContentJSON.content.MediaName,
             isPaused: ContentJSON.content.IsPaused,
             host: UserID,
-            type: RoomType,
+            type: RoomType as "private" | "public",
             mods: [],
             members: [UserID],
             messages: {}
@@ -445,7 +423,7 @@ const host = (UserID: string, ContentJSON: sendMessageTypes.host): void => {
         rooms[RoomID].members.push(UserID);
         members[UserID].In = RoomID;
 
-        const currentRoom = rooms[RoomID],
+        const currentRoom: RoomsObj[""] = rooms[RoomID],
             membersObj = {};
 
         for(const memberID of currentRoom.members) {
@@ -549,7 +527,7 @@ const host = (UserID: string, ContentJSON: sendMessageTypes.host): void => {
         if(!validateMessage(ContentJSON, { type: "test", content: "test" }))
             return sendError(UserID, `Invalid message format for ${ContentJSON.type}.`);
 
-        const RoomID = members[UserID].In;
+        const RoomID: string = members[UserID].In;
         if(!RoomID) 
             return sendError(UserID, `Member ${UserID} does not belong to a room.`);
         
@@ -703,7 +681,7 @@ const host = (UserID: string, ContentJSON: sendMessageTypes.host): void => {
             return;
 
         for(const UserID of rooms[RoomID].members) {
-            const member = members[UserID];
+            const member: MembersObj[""] = members[UserID];
             const session: ws.WebSocket = getSession(UserID);
             if(member && session && session.readyState === ws.WebSocket.OPEN && !except.includes(UserID)) {
                 session.send(JSON.stringify(ContentJSON));

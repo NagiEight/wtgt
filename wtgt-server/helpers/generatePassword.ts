@@ -13,8 +13,7 @@ const generatePassword = (length: number = 16, previous?: string): string => {
             ALPHA,
             numeric,
             specs
-        ]
-    ;
+        ];
     
     let output: string = "";
 

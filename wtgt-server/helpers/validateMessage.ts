@@ -13,8 +13,11 @@ type getTypeResults =
     | "array" 
     | "number";
 
-const sameKeys = (a: Object, b: object): boolean => 
-    (Object.keys(a).sort().length === Object.keys(b).sort().length) && Object.keys(a).sort().every((k, i) => k === Object.keys(b).sort()[i]);
+const sameKeys = (a: Object, b: object): boolean => {
+    const ka: string[] = Object.keys(a).sort();
+    const kb: string[] = Object.keys(b).sort();
+    return ka.length === kb.length && ka.every((k, i) => k === kb[i]);
+}
 
 const getType = (object: any): getTypeResults => {
     switch(object) {
@@ -37,7 +40,7 @@ const getType = (object: any): getTypeResults => {
     }
 };
 
-const validateMessage = (message: any | Object | Array<any>, sample: any | Object | Array<any>): boolean => {
+const validateMessage = (message: any, sample: any): boolean => {
     const typeMessage = getType(message);
     const typeSample = getType(sample);
 
