@@ -107,30 +107,9 @@ type AdminSendMessageTypes =
     | adminReceiveMessageTypes.connection;
 
 const print = (string: string, RoomID?: string): void => {
-    console.log(`${util.styleText("yellowBright", `[${getCurrentTime()}]`)}${RoomID ? `${util.styleText("greenBright", `{${RoomID}}`)}` : ""} ${string}`);
-    logs.push(`[${getCurrentTime()}]${RoomID ? `{${RoomID}}` : ""} ${string}`);
-};
-
-const Routers: Router[] = [
-        async (parts: string[], url: URL): Promise<string | null> => {
-            if(parts[1] !== "admin" || parts[2] !== "panel")
-                return null;
-            if(url.searchParams.get("p") !== config.PanelPassword)
-                return "403";
-            if(parts.length === 4)
-                return path.join("admin", "panel", "panel.html");
-            if(parts.length === 5)
-                return path.join("admin", "panel", path.basename(url.pathname));
-            return null;
-        },
-        async (parts: string[], url: URL): Promise<string | null> => parts[1] === "admin" && parts.length === 4 && path.join("admin", path.basename(url.pathname)),
-        async (parts: string[]): Promise<string | null> => parts[1] === "admin" && parts.length === 3 && path.join("admin", "login.html"),
-        async (parts: string[], url: URL): Promise<string | null> => parts[1] === "watch" && parts.length === 4 && path.join("public", "watch", path.basename(url.pathname)),
-        async (parts: string[]): Promise<string | null> => parts[1] === "watch" && parts.length === 3 && path.join("public", "watch", "watch.html"),
-        async (parts: string[], url: URL): Promise<string | null> => parts.length === 3 && path.join("public", path.basename(url.pathname)),
-        async (parts: string[]): Promise<string | null> => parts.length === 2 && path.join("public", "index.html")
-    ],
-    buckets: Bucket = {},
+        console.log(`${util.styleText("yellowBright", `[${getCurrentTime()}]`)}${RoomID ? `${util.styleText("greenBright", `{${RoomID}}`)}` : ""} ${string}`);
+        logs.push(`[${getCurrentTime()}]${RoomID ? `{${RoomID}}` : ""} ${string}`);
+    },
     hoursToMs = (time: number): number => time * 3600000,
     allowRequest = (IP: string): boolean => {
         const refillRate = config.BucketCapacity / hoursToMs(config.BucketRefillInterval);
@@ -228,6 +207,26 @@ const Routers: Router[] = [
     },
     registerProtocol = <T extends ContentJSONType>(messageName: string) => (target: (UserID: string, ContentJSON: T) => void): void => 
         (protocolRegistry[messageName] = target) as unknown as void,
+    Routers: Router[] = [
+        async (parts: string[], url: URL): Promise<string | null> => {
+            if(parts[1] !== "admin" || parts[2] !== "panel")
+                return null;
+            if(url.searchParams.get("p") !== config.PanelPassword)
+                return "403";
+            if(parts.length === 4)
+                return path.join("admin", "panel", "panel.html");
+            if(parts.length === 5)
+                return path.join("admin", "panel", path.basename(url.pathname));
+            return null;
+        },
+        async (parts: string[], url: URL): Promise<string | null> => parts[1] === "admin" && parts.length === 4 && path.join("admin", path.basename(url.pathname)),
+        async (parts: string[]): Promise<string | null> => parts[1] === "admin" && parts.length === 3 && path.join("admin", "login.html"),
+        async (parts: string[], url: URL): Promise<string | null> => parts[1] === "watch" && parts.length === 4 && path.join("public", "watch", path.basename(url.pathname)),
+        async (parts: string[]): Promise<string | null> => parts[1] === "watch" && parts.length === 3 && path.join("public", "watch", "watch.html"),
+        async (parts: string[], url: URL): Promise<string | null> => parts.length === 3 && path.join("public", path.basename(url.pathname)),
+        async (parts: string[]): Promise<string | null> => parts.length === 2 && path.join("public", "index.html")
+    ],
+    buckets: Bucket = {},
     protocolRegistry: { [MessageName: string]: (UserID: string, ContentJSON: ContentJSONType) => void } = {},
     server: http.Server<typeof http.IncomingMessage, typeof http.ServerResponse> = http.createServer(serverInternals),
     wss: ws.WebSocketServer = new ws.WebSocketServer({ server }),
@@ -319,7 +318,7 @@ wss.on("connection", (client: ws.WebSocket, req: http.IncomingMessage): void => 
         }
 
         const type: ContentJSONType["type"] = ContentJSON.type;
-        const protocol: (UserID: string, ContentJSON: ContentJSONType) => void = protocolRegistry[type];
+        const protocol = protocolRegistry[type];
         if(!protocol)
             return sendError(UserID, `Unknown message type: ${type}.`);
         protocol(UserID, ContentJSON);
