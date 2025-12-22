@@ -23,7 +23,7 @@ const getCurrentTime = (): string => {
         day: number = now.getDate(),
         month: number = now.getMonth(),
         year: number = now.getFullYear(),
-        formatted: string = `${monthNames[month]} ${formatOridinal(day)} ${year} ${hours <= 12 ? hours : hours - 12}:${minutes}:${seconds} ${hours < 12 ? "a.m." : "p.m."}`;
+        formatted: string = `${monthNames[month]} ${formatOridinal(day)} ${year} ${(hours <= 12 ? hours : hours - 12).toString().padStart(2)}:${minutes.toString().padStart(2)}:${seconds.toString().padStart(2)} ${hours < 12 ? "a.m" : "p.m"}`;
     return formatted;
 };
 

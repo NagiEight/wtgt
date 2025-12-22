@@ -4,6 +4,8 @@ import fs from "fs/promises";
 import path from "path";
 import crypto from "crypto";
 import util from "util";
+import os from "os";
+import child_process from "child_process";
 
 import * as ws from "ws";
 
@@ -52,11 +54,11 @@ interface Config {
     PORT: number;
     PanelPassword: string;
     RegeneratePassword: boolean;
-    PasswordRegenerationInterval: number;
+    PasswordRegenerationIntervalHours: number;
     ServerTerminalFlushing: boolean;
-    FlushingInterval: number;
+    FlushingIntervalHours: number;
     BucketCapacity: number;
-    BucketRefillInterval: number;
+    BucketRefillIntervalHours: number;
 }
 
 interface Bucket {
@@ -106,13 +108,21 @@ type AdminSendMessageTypes =
     | adminReceiveMessageTypes.roomEnd 
     | adminReceiveMessageTypes.connection;
 
-const print = (string: string, RoomID?: string): void => {
-        console.log(`${util.styleText("yellowBright", `[${getCurrentTime()}]`)}${RoomID ? `${util.styleText("greenBright", `{${RoomID}}`)}` : ""} ${string}`);
-        logs.push(`[${getCurrentTime()}]${RoomID ? `{${RoomID}}` : ""} ${string}`);
+const print = (object: any, RoomID?: string): void => {
+        let toPrint = object;
+        if(typeof toPrint === "object")
+            toPrint = util.inspect(toPrint);
+        console.log(`${util.styleText("yellowBright", `[${getCurrentTime()}]`)}${RoomID ? `${util.styleText("greenBright", `{${RoomID}}`)}` : ""} ${toPrint}`);
+        logs.push(`[${getCurrentTime()}]${RoomID ? `{${RoomID}}` : ""} ${object}`);
+    },
+    clear = (): void => {
+        if(os.platform() === "win32")
+            child_process.spawn("cls", { stdio: "inherit", shell: true });
+        else child_process.spawn("clear", { stdio: "inherit", shell: true });
     },
     hoursToMs = (time: number): number => time * 3600000,
     allowRequest = (IP: string): boolean => {
-        const refillRate = config.BucketCapacity / hoursToMs(config.BucketRefillInterval);
+        const refillRate = config.BucketCapacity / hoursToMs(config.BucketRefillIntervalHours);
 
         const now: number = Date.now();
         let bucket = buckets[IP];
@@ -134,10 +144,10 @@ const print = (string: string, RoomID?: string): void => {
     getIPs = (req: http.IncomingMessage): string[] => [...(
             Array.isArray(req.headers["x-forwarded-for"]) ? 
             req.headers["x-forwarded-for"] : 
-            (req.headers["x-forwarded-for"] || "").replace(/ /g, "").split(",").filter(Boolean)
+            (req.headers["x-forwarded-for"] as string || "").replace(/ /g, "").split(",")
         ),
         req.socket.remoteAddress
-    ],
+    ].filter(Boolean),
     serverInternals = async (req: http.IncomingMessage, res: http.ServerResponse): Promise<void> => {
         const addresses: string[] = getIPs(req);
         for(const address of addresses) {
@@ -166,7 +176,7 @@ const print = (string: string, RoomID?: string): void => {
          * /admin/panel/ -> admin/panel/panel.html
          * /admin/panel/file.ext/ -> admin/panel/file.ext
          */
-        const fullUrl: URL = new URL(req.headers.host + req.url),
+        const fullUrl: URL = new URL("https://temp.com" + req.url),
             staticExtensions: { [Ext: string]: string } = {
                 ".js": "application/javascript",
                 ".png": "image/png",
@@ -195,6 +205,12 @@ const print = (string: string, RoomID?: string): void => {
             filePath = result;
             break;
         }
+        print(filePath);
+        print(urlParts);
+        res.writeHead(200, { "content-type": "text/plain" });
+        res.end(filePath);
+        return;
+        
         if(filePath && existsSync(filePath)) {
             const ext: string = path.extname(filePath);
             res.writeHead(200, { "content-type": staticExtensions[ext] });
@@ -240,11 +256,11 @@ const print = (string: string, RoomID?: string): void => {
         PORT: 3000,
         PanelPassword: "",
         RegeneratePassword: true,
-        PasswordRegenerationInterval: 12,
+        PasswordRegenerationIntervalHours: 12,
         ServerTerminalFlushing: true,
-        FlushingInterval: 12,
+        FlushingIntervalHours: 12,
         BucketCapacity: 2500,
-        BucketRefillInterval: 1
+        BucketRefillIntervalHours: 1
     },
     config: Config = await (async (): Promise<Config> => {
         const propertiesPath: string = "./server-properties";
@@ -266,8 +282,8 @@ const print = (string: string, RoomID?: string): void => {
             Output = defaultConfig;
         }
 
-        if(config.PanelPassword === "") {
-            config.PanelPassword = generatePassword(config.AdminPasswordLength);
+        if(Output.PanelPassword === "") {
+            Output.PanelPassword = generatePassword(Output.AdminPasswordLength);
         }
 
         await fs.writeFile(configPath, JSON.stringify(Output, null, 4), { encoding: "utf-8" });
@@ -280,7 +296,7 @@ wss.on("connection", (client: ws.WebSocket, req: http.IncomingMessage): void => 
             UserName: url.searchParams.get("UserName"),
             Avt: url.searchParams.get("Avt")
         },
-        UserID = generateUserUUID();
+        UserID = generateUniqueUUID((UUID: string): boolean => Boolean(members[UUID]));
 
     members[UserID] = {
         UserName: userProfile.UserName,
@@ -343,7 +359,7 @@ registerProtocol("host")((UserID: string, ContentJSON: sendMessageTypes.host): v
     if(!allowedRoomTypes.includes(RoomType))
         return sendError(UserID, `Unknown room type: ${RoomType}.`);
 
-    const RoomID: string = generateRoomUUID();
+    const RoomID: string = generateUniqueUUID((UUID: string) => Boolean(rooms[UUID]));
 
     members[UserID].In = RoomID;
     rooms[RoomID] = {
@@ -466,14 +482,14 @@ registerProtocol("leave")((UserID: string, ContentJSON: sendMessageTypes.leave):
 });
 
 registerProtocol("message")((UserID: string, ContentJSON: sendMessageTypes.message): void => {
-    if(!validateMessage(ContentJSON, { type: "test", content: "test" })) 
+    if(!validateMessage(ContentJSON, { type: "test", content: { Text: "test" } })) 
         return sendError(UserID, `Invalid message format for ${ContentJSON.type}.`);
 
     const RoomID: string = members[UserID].In;
     if(!members[UserID].In) 
         return sendError(UserID, `Member ${UserID} does not belong to a room.`);
 
-    const MessageID: string = generateMessageUUID(RoomID),
+    const MessageID: string = generateUniqueUUID((UUID: string): boolean => Boolean(rooms[RoomID].messages[UUID])),
         MessageObject = {
             Sender: UserID,
             Text: ContentJSON.content.Text,
@@ -494,7 +510,7 @@ registerProtocol("message")((UserID: string, ContentJSON: sendMessageTypes.messa
 });
 
 registerProtocol("election")((UserID: string, ContentJSON: sendMessageTypes.election): void => {
-    if(!validateMessage(ContentJSON, { type: "test", content: "test" }))
+    if(!validateMessage(ContentJSON, { type: "test", content: { MemberID: "test" } }))
         return sendError(UserID, `Invalid message format for ${ContentJSON.type}.`);
 
     const RoomID: string = members[UserID].In;
@@ -528,7 +544,7 @@ registerProtocol("election")((UserID: string, ContentJSON: sendMessageTypes.elec
 });
 
 registerProtocol("demotion")((UserID: string, ContentJSON: sendMessageTypes.demotion): void => {
-    if(!validateMessage(ContentJSON, { type: "test", content: "test" })) 
+    if(!validateMessage(ContentJSON, { type: "test", content: { MemberID: "test" } })) 
         return sendError(UserID, `Invalid message format for ${ContentJSON.type}.`);
     
     const RoomID: string = members[UserID].In;
@@ -680,7 +696,7 @@ const broadcastToRoom = (RoomID: string, ContentJSON: SendMessageTypes, ...excep
         process.exit(0);
     }, 
     writeLog = async (): Promise<void> => { 
-        await fs.writeFile(path.join("logs", generateLogsUUID()), logs.join("\n"), { encoding: "utf-8" });
+        await fs.writeFile(path.join("logs", generateUniqueUUID((UUID: string): boolean => existsSync(path.join("logs", `${UUID}.log`)))), logs.join("\n"), { encoding: "utf-8" });
         logs.length = 0;
     },
     sendError = (UserID: string, Message: string): void => getSession(UserID).send(JSON.stringify({
@@ -693,39 +709,12 @@ const broadcastToRoom = (RoomID: string, ContentJSON: SendMessageTypes, ...excep
             getSession(admin).send(JSON.stringify(ContentJSON));
         }
     }, 
-    generateRoomUUID = (): string => {
+    generateUniqueUUID = (prerequisite: (UUID: string) => boolean): string => {
         let UUID: string;
 
         do {
             UUID = crypto.randomUUID();
-        } while(rooms[UUID]);
-
-        return UUID;
-    }, 
-    generateMessageUUID = (RoomID: string): string => {
-        let UUID: string;
-
-        do {
-            UUID = crypto.randomUUID();
-        } while(rooms[RoomID].messages[UUID]);
-
-        return UUID;
-    }, 
-    generateLogsUUID = (): string => {
-        let UUID: string;
-        
-        do {
-            UUID = crypto.randomUUID();
-        } while(existsSync(path.join("logs", `${UUID}.log`)));
-
-        return UUID;
-    }, 
-    generateUserUUID = (): string => {
-        let UUID: string;
-        
-        do {
-            UUID = crypto.randomUUID();
-        } while(members[UUID]);
+        } while(prerequisite(UUID));
 
         return UUID;
     };
@@ -744,13 +733,13 @@ server.listen(config.PORT, () => {
             config.PanelPassword = generatePassword(config.AdminPasswordLength, config.PanelPassword);
             await fs.writeFile(path.join("./server-properties", "config.json"), JSON.stringify(config, null, 4), { encoding: "utf-8" });
             print(`Password resetted. Current Admin panel password is: ${config.PanelPassword}`);
-        }, hoursToMs(config.PasswordRegenerationInterval));
+        }, hoursToMs(config.PasswordRegenerationIntervalHours));
     }
     if(config.ServerTerminalFlushing) {
         setInterval(async () => {
             await writeLog();
-            console.clear();
+            clear();
             print(`Current Admin panel password is: ${config.PanelPassword}`);
-        }, hoursToMs(config.FlushingInterval));
+        }, hoursToMs(config.FlushingIntervalHours));
     }
 });
