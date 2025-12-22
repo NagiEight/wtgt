@@ -296,7 +296,7 @@ wss.on("connection", (client: ws.WebSocket, req: http.IncomingMessage): void => 
             UserName: url.searchParams.get("UserName"),
             Avt: url.searchParams.get("Avt")
         },
-        UserID = generateUniqueUUID((UUID: string): boolean => Boolean(members[UUID]));
+        UserID = generateUniqueUUID((UUID: string): boolean => !Boolean(members[UUID]));
 
     members[UserID] = {
         UserName: userProfile.UserName,
@@ -359,7 +359,7 @@ registerProtocol("host")((UserID: string, ContentJSON: sendMessageTypes.host): v
     if(!allowedRoomTypes.includes(RoomType))
         return sendError(UserID, `Unknown room type: ${RoomType}.`);
 
-    const RoomID: string = generateUniqueUUID((UUID: string) => Boolean(rooms[UUID]));
+    const RoomID: string = generateUniqueUUID((UUID: string) => !Boolean(rooms[UUID]));
 
     members[UserID].In = RoomID;
     rooms[RoomID] = {
@@ -489,7 +489,7 @@ registerProtocol("message")((UserID: string, ContentJSON: sendMessageTypes.messa
     if(!members[UserID].In) 
         return sendError(UserID, `Member ${UserID} does not belong to a room.`);
 
-    const MessageID: string = generateUniqueUUID((UUID: string): boolean => Boolean(rooms[RoomID].messages[UUID])),
+    const MessageID: string = generateUniqueUUID((UUID: string): boolean => !Boolean(rooms[RoomID].messages[UUID])),
         MessageObject = {
             Sender: UserID,
             Text: ContentJSON.content.Text,
