@@ -1,4 +1,4 @@
-import * as crypto from "crypto";
+import crypto from "crypto";
 
 const generatePassword = (length: number = 16, previous?: string): string => {
     if(length <= 0) 

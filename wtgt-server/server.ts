@@ -4,9 +4,6 @@ import fs from "fs/promises";
 import path from "path";
 import crypto from "crypto";
 import util from "util";
-import os from "os";
-import child_process from "child_process";
-
 import * as ws from "ws";
 
 import { existsSync } from "fs";
@@ -110,15 +107,10 @@ type AdminSendMessageTypes =
 
 const print = (object: any, RoomID?: string): void => {
         let toPrint = object;
-        if(typeof toPrint === "object")
-            toPrint = util.inspect(toPrint);
+        if(typeof toPrint !== "string")
+            toPrint = util.inspect(object);
         console.log(`${util.styleText("yellowBright", `[${getCurrentTime()}]`)}${RoomID ? `${util.styleText("greenBright", `{${RoomID}}`)}` : ""} ${toPrint}`);
-        logs.push(`[${getCurrentTime()}]${RoomID ? `{${RoomID}}` : ""} ${object}`);
-    },
-    clear = (): void => {
-        if(os.platform() === "win32")
-            child_process.spawn("cls", { stdio: "inherit", shell: true });
-        else child_process.spawn("clear", { stdio: "inherit", shell: true });
+        logs.push(`[${getCurrentTime()}]${RoomID ? `{${RoomID}}` : ""} ${toPrint}`);
     },
     hoursToMs = (time: number): number => time * 3600000,
     allowRequest = (IP: string): boolean => {
@@ -205,6 +197,7 @@ const print = (object: any, RoomID?: string): void => {
             filePath = result;
             break;
         }
+
         print(filePath);
         print(urlParts);
         res.writeHead(200, { "content-type": "text/plain" });
@@ -272,7 +265,7 @@ const print = (object: any, RoomID?: string): void => {
         try {
             Output = JSON.parse(await fs.readFile(configPath, "utf-8"));
 
-            if(!validateMessage(config, defaultConfig)) 
+            if(!validateMessage(Output, defaultConfig)) 
                 Output = defaultConfig;
         }
         catch(err) {
@@ -333,15 +326,16 @@ wss.on("connection", (client: ws.WebSocket, req: http.IncomingMessage): void => 
             return sendError(UserID, "Invalid JSON message sent, try again.");
         }
 
-        const type: ContentJSONType["type"] = ContentJSON.type;
-        const protocol = protocolRegistry[type];
+        const protocol = protocolRegistry[ContentJSON.type];
         if(!protocol)
-            return sendError(UserID, `Unknown message type: ${type}.`);
+            return sendError(UserID, `Unknown message type: ${ContentJSON.type}.`);
         protocol(UserID, ContentJSON);
     });
 });
 
-registerProtocol("host")((UserID: string, ContentJSON: sendMessageTypes.host): void => {
+// fake ass decorator
+registerProtocol("host")
+((UserID: string, ContentJSON: sendMessageTypes.host): void => {
     if(!validateMessage(ContentJSON, { type: "test", content: { MediaName: "test", RoomType: "test", IsPaused: true }})) 
         return sendError(UserID, `Invalid message format for ${ContentJSON.type}.`);
 
@@ -390,7 +384,8 @@ registerProtocol("host")((UserID: string, ContentJSON: sendMessageTypes.host): v
     });
 });
 
-registerProtocol("join")((UserID: string, ContentJSON: sendMessageTypes.join): void => {
+registerProtocol("join")
+((UserID: string, ContentJSON: sendMessageTypes.join): void => {
     if(!validateMessage(ContentJSON, { type: "test", content: { RoomID: "" } })) 
         return sendError(UserID, `Invalid message format for ${ContentJSON.type}.`);
 
@@ -448,7 +443,8 @@ registerProtocol("join")((UserID: string, ContentJSON: sendMessageTypes.join): v
     print(`${UserID} joined a room.`, RoomID);
 });
 
-registerProtocol("leave")((UserID: string, ContentJSON: sendMessageTypes.leave): void => {
+registerProtocol("leave")
+((UserID: string, ContentJSON: sendMessageTypes.leave): void => {
     if(!validateMessage(ContentJSON, { type: "" }))
         return sendError(UserID, `Invalid message format for ${ContentJSON.type}.`);
 
@@ -465,23 +461,24 @@ registerProtocol("leave")((UserID: string, ContentJSON: sendMessageTypes.leave):
         delete rooms[RoomID];
         broadcastToAdmins({ type: "roomEnd", content: { RoomID } });
         print(`${UserID} ended their room session.`, RoomID);
+        return;
     }
-    else {
-        rooms[RoomID].members.splice(rooms[RoomID].members.indexOf(UserID), 1);
-        broadcastToRoom(RoomID, { type: "leave", content: { MemberID: UserID } });
-        members[UserID].In = "";
-        broadcastToAdmins({
-            type: "memberLeave",
-            content: {
-                RoomID,
-                UserID
-            }
-        });
-        print(`${UserID} left.`, RoomID);
-    }
+    const roomMember: string[] = rooms[RoomID].members;
+    roomMember.splice(roomMember.indexOf(UserID), 1);
+    broadcastToRoom(RoomID, { type: "leave", content: { MemberID: UserID } });
+    members[UserID].In = "";
+    broadcastToAdmins({
+        type: "memberLeave",
+        content: {
+            RoomID,
+            UserID
+        }
+    });
+    print(`${UserID} left.`, RoomID);
 });
 
-registerProtocol("message")((UserID: string, ContentJSON: sendMessageTypes.message): void => {
+registerProtocol("message")
+((UserID: string, ContentJSON: sendMessageTypes.message): void => {
     if(!validateMessage(ContentJSON, { type: "test", content: { Text: "test" } })) 
         return sendError(UserID, `Invalid message format for ${ContentJSON.type}.`);
 
@@ -509,7 +506,8 @@ registerProtocol("message")((UserID: string, ContentJSON: sendMessageTypes.messa
     print(`${UserID}: ${ContentJSON.content.Text}`, RoomID);
 });
 
-registerProtocol("election")((UserID: string, ContentJSON: sendMessageTypes.election): void => {
+registerProtocol("election")
+((UserID: string, ContentJSON: sendMessageTypes.election): void => {
     if(!validateMessage(ContentJSON, { type: "test", content: { MemberID: "test" } }))
         return sendError(UserID, `Invalid message format for ${ContentJSON.type}.`);
 
@@ -543,7 +541,8 @@ registerProtocol("election")((UserID: string, ContentJSON: sendMessageTypes.elec
     else sendError(UserID, `Unknown member ${ContentJSON.content.MemberID}: Member does not exist or does not belong to this room.`);
 });
 
-registerProtocol("demotion")((UserID: string, ContentJSON: sendMessageTypes.demotion): void => {
+registerProtocol("demotion")
+((UserID: string, ContentJSON: sendMessageTypes.demotion): void => {
     if(!validateMessage(ContentJSON, { type: "test", content: { MemberID: "test" } })) 
         return sendError(UserID, `Invalid message format for ${ContentJSON.type}.`);
     
@@ -579,7 +578,8 @@ registerProtocol("demotion")((UserID: string, ContentJSON: sendMessageTypes.demo
     else sendError(UserID, `Unknown member ${ContentJSON.content.MemberID}: Member does not exist or does not belong to this room.`);
 });
 
-registerProtocol("pause")((UserID: string, ContentJSON: sendMessageTypes.pause): void => {
+registerProtocol("pause")
+((UserID: string, ContentJSON: sendMessageTypes.pause): void => {
     if(!validateMessage(ContentJSON, { type: "test", content: { IsPaused: false } }))
         return sendError(UserID, `Invalid message format for ${ContentJSON.type}.`);
 
@@ -595,7 +595,8 @@ registerProtocol("pause")((UserID: string, ContentJSON: sendMessageTypes.pause):
     print(`${UserID} paused.`, RoomID);
 });
 
-registerProtocol("sync")((UserID: string, ContentJSON: sendMessageTypes.sync): void => {
+registerProtocol("sync")
+((UserID: string, ContentJSON: sendMessageTypes.sync): void => {
     if(!validateMessage(ContentJSON, { type: "test", content: { Timestamp: 1234 } }))
         return sendError(UserID, `Invalid message format for ${ContentJSON.type}.`);
 
@@ -614,7 +615,8 @@ registerProtocol("upload")((UserID: string, ContentJSON: sendMessageTypes.upload
 
 });
 
-registerProtocol("adminLogin")((AdminID: string, ContentJSON: adminSendMessageTypes.adminLogin): void => {
+registerProtocol("adminLogin")
+((AdminID: string, ContentJSON: adminSendMessageTypes.adminLogin): void => {
     if(!validateMessage(ContentJSON, { type: "test", content: { Password: "string" } })) 
         return sendError(AdminID, `Invalid message format for ${ContentJSON.type}.`);
 
@@ -650,7 +652,8 @@ registerProtocol("adminLogin")((AdminID: string, ContentJSON: adminSendMessageTy
     }));
 });
 
-registerProtocol("adminLogout")((AdminID: string, ContentJSON: adminSendMessageTypes.adminLogout): void => {
+registerProtocol("adminLogout")
+((AdminID: string, ContentJSON: adminSendMessageTypes.adminLogout): void => {
     if(!validateMessage(ContentJSON, { type: "adminLogout" })) 
         return sendError(AdminID, `Invalid message format for ${ContentJSON.type}.`);
 
@@ -660,7 +663,8 @@ registerProtocol("adminLogout")((AdminID: string, ContentJSON: adminSendMessageT
     adminIDs.splice(adminIDs.indexOf(AdminID), 1);
 });
 
-registerProtocol("shutdown")((AdminID: string, ContentJSON: adminSendMessageTypes.shutdown): void => {
+registerProtocol("shutdown")
+((AdminID: string, ContentJSON: adminSendMessageTypes.shutdown): void => {
     if(!validateMessage(ContentJSON, { type: "shutdown" }))
         return sendError(AdminID, `Invalid message format for ${ContentJSON.type}.`);
 
@@ -670,6 +674,9 @@ registerProtocol("shutdown")((AdminID: string, ContentJSON: adminSendMessageType
     close();
 });
 
+/**
+ * Broadcast ContentJSON to room of RoomID.
+ */
 const broadcastToRoom = (RoomID: string, ContentJSON: SendMessageTypes, ...except: string[]): void => {
         if(!rooms[RoomID])
             return;
@@ -682,6 +689,9 @@ const broadcastToRoom = (RoomID: string, ContentJSON: SendMessageTypes, ...excep
             }
         }
     }, 
+    /**
+     * Stop the server and write log.
+     */
     close = (): void => {
         wss.clients.forEach((client: ws.WebSocket): void => {
             try {
@@ -695,20 +705,31 @@ const broadcastToRoom = (RoomID: string, ContentJSON: SendMessageTypes, ...excep
         server.close(writeLog);
         process.exit(0);
     }, 
+    /**
+     * Write server's log to a file and empty the log array.
+     */
     writeLog = async (): Promise<void> => { 
         await fs.writeFile(path.join("logs", generateUniqueUUID((UUID: string): boolean => existsSync(path.join("logs", `${UUID}.log`)))), logs.join("\n"), { encoding: "utf-8" });
         logs.length = 0;
     },
+    /**
+     * Send an error message to UserID.
+     */
     sendError = (UserID: string, Message: string): void => getSession(UserID).send(JSON.stringify({
         type: "error",
         content: { Message }
     })), 
+    /**
+     * Get the websocket connection belongs to UserID.
+     */
     getSession = (UserID: string): ws.WebSocket => members[UserID].Socket,
-    broadcastToAdmins = (ContentJSON: AdminSendMessageTypes): void => {
-        for(const admin of adminIDs) {
-            getSession(admin).send(JSON.stringify(ContentJSON));
-        }
-    }, 
+    /**
+     * Broacast ContentJSON to all active admin clients.
+     */
+    broadcastToAdmins = (ContentJSON: AdminSendMessageTypes): void => adminIDs.forEach((admin) => getSession(admin).send(JSON.stringify(ContentJSON))), 
+    /**
+     * Generate a unique UUID base on the prerequisite function, regenerate if prerequisite returns true.
+     */
     generateUniqueUUID = (prerequisite: (UUID: string) => boolean): string => {
         let UUID: string;
 
@@ -738,7 +759,7 @@ server.listen(config.PORT, () => {
     if(config.ServerTerminalFlushing) {
         setInterval(async () => {
             await writeLog();
-            clear();
+            console.clear();
             print(`Current Admin panel password is: ${config.PanelPassword}`);
         }, hoursToMs(config.FlushingIntervalHours));
     }
