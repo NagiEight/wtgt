@@ -1,11 +1,11 @@
-interface info {
+export interface info {
     type: "info";
     content: {
         RoomID: string;
     };
 }
 
-interface init {
+export interface init {
     type: "init";
     content: {
         CurrentMedia: string;
@@ -28,7 +28,7 @@ interface init {
     };
 }
 
-interface join {
+export interface join {
     type: "join";
     content: {
         UserID: string;
@@ -37,7 +37,7 @@ interface join {
     };
 }
 
-interface message {
+export interface message {
     type: "message";
     content: {
         MessageID: string;
@@ -47,63 +47,49 @@ interface message {
     };
 }
 
-interface election {
+export interface election {
     type: "election";
     content: {
-        MemberID: string;
+        Target: string;
     };
 }
 
-interface demotion {
+export interface demotion {
     type: "demotion";
     content: {
-        MemberID: string;
+        Target: string;
     };
 }
 
-interface leave {
+export interface leave {
     type: "leave";
     content: {
         MemberID: string;
     };
 }
 
-interface end {
+export interface end {
     type: "end";
     content: undefined;
 }
 
-interface pause {
+export interface pause {
     type: "pause";
     content: {
         IsPaused: boolean;
     };
 }
 
-interface sync {
+export interface sync {
     type: "sync";
     content: {
         Timestamp: number;
     };
 }
 
-interface upload {
+export interface upload {
     type: "upload";
     content: {
         MediaName: string;
     };
 }
-
-export {
-    info,
-    init,
-    join,
-    message,
-    election,
-    demotion,
-    leave,
-    end,
-    pause,
-    sync,
-    upload
-};

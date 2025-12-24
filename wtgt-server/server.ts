@@ -1,3 +1,5 @@
+"use strict";
+
 import https from "https";
 import http from "http";
 import fs from "fs/promises";
@@ -41,6 +43,7 @@ interface MembersObj {
         In: string;
         Avt: string;
         AdminLoginAttempts: number;
+        IsAuthorized: boolean;
         Socket: ws.WebSocket;
     };
 }
@@ -197,7 +200,7 @@ const print = (object: any, RoomID?: string): void => {
             filePath = result;
             break;
         }
-
+        
         print(filePath);
         print(urlParts);
         res.writeHead(200, { "content-type": "text/plain" });
@@ -216,6 +219,22 @@ const print = (object: any, RoomID?: string): void => {
     },
     registerProtocol = <T extends ContentJSONType>(messageName: string) => (target: (UserID: string, ContentJSON: T) => void): void => 
         (protocolRegistry[messageName] = target) as unknown as void,
+    sanitizeConfig = <T>(input: unknown, template: T): T => {
+        if(typeof template !== "object" || template === null) 
+            return (typeof input === typeof template ? input : template) as T;
+
+        if(typeof input !== "object" || input === null) 
+            return structuredClone(template);
+        
+        const result: any = Array.isArray(template) ? [] : {};
+        for(const key in template) {
+            const templateValue = (template as any)[key];
+            const inputValue = (input as any)[key];
+    
+            result[key] = sanitizeConfig(inputValue, templateValue);
+        }
+        return result;    
+    },
     Routers: Router[] = [
         async (parts: string[], url: URL): Promise<string | null> => {
             if(parts[1] !== "admin" || parts[2] !== "panel")
@@ -237,12 +256,10 @@ const print = (object: any, RoomID?: string): void => {
     ],
     buckets: Bucket = {},
     protocolRegistry: { [MessageName: string]: (UserID: string, ContentJSON: ContentJSONType) => void } = {},
-    server: http.Server<typeof http.IncomingMessage, typeof http.ServerResponse> = http.createServer(serverInternals),
-    wss: ws.WebSocketServer = new ws.WebSocketServer({ server }),
     rooms: RoomsObj = {},
     members: MembersObj = {},
-    adminIDs: string[] = [],
     logs: string[] = [],
+    adminLookUp: string[] = [],
     defaultConfig: Config = {
         AdminPasswordLength: 16,
         MaxAdminLoginAttempts: 5,
@@ -263,16 +280,12 @@ const print = (object: any, RoomID?: string): void => {
         let Output: Config;
 
         try {
-            Output = JSON.parse(await fs.readFile(configPath, "utf-8"));
-
-            if(!validateMessage(Output, defaultConfig)) 
-                Output = defaultConfig;
+            const raw: Config = JSON.parse(await fs.readFile(configPath, "utf-8"));
+            Output = sanitizeConfig(raw, defaultConfig);
         }
         catch(err) {
-            if(err instanceof Error)
-                print(`Error reading config: ${err.message}`);
-            else print(`Error reading config: ${err}`);
-            Output = defaultConfig;
+            print(`Error reading config: ${err instanceof Error ? err.message : err}`);
+            Output = structuredClone(defaultConfig);
         }
 
         if(Output.PanelPassword === "") {
@@ -282,6 +295,9 @@ const print = (object: any, RoomID?: string): void => {
         await fs.writeFile(configPath, JSON.stringify(Output, null, 4), { encoding: "utf-8" });
         return Output;
     })();
+
+const server: http.Server<typeof http.IncomingMessage, typeof http.ServerResponse> = http.createServer(serverInternals),
+    wss: ws.WebSocketServer = new ws.WebSocketServer({ server });
 
 wss.on("connection", (client: ws.WebSocket, req: http.IncomingMessage): void => {
     const url: URL = new URL(req.url, `ws://${req.headers.host}`),
@@ -296,18 +312,19 @@ wss.on("connection", (client: ws.WebSocket, req: http.IncomingMessage): void => 
         Avt: userProfile.Avt,
         In: "",
         AdminLoginAttempts: 0,
+        IsAuthorized: false,
         Socket: client
     };
 
     client.on("close", () => {
-        if(adminIDs.includes(UserID)) 
-            adminIDs.splice(adminIDs.indexOf(UserID), 1);
+        if(members[UserID].IsAuthorized)
+            adminLookUp.splice(adminLookUp.indexOf(UserID), 1);
         print(`${UserID} disconnected.`);
         delete members[UserID];
     });
 
     client.on("message", (data: ws.RawData): void => {
-        if(!adminIDs.includes(UserID)) {
+        if(!members[UserID].IsAuthorized) {
             const addresses: string[] = getIPs(req);
 
             for(const address of addresses) {
@@ -389,11 +406,12 @@ registerProtocol("join")
     if(!validateMessage(ContentJSON, { type: "test", content: { RoomID: "" } })) 
         return sendError(UserID, `Invalid message format for ${ContentJSON.type}.`);
 
-    if(!rooms[ContentJSON.content.RoomID])
-        return sendError(UserID, `Unknown room ${ContentJSON.content.RoomID}.`);
+    const RoomID: string = ContentJSON.content.RoomID;
 
-    const isInRoom: boolean = members[UserID].In !== "",
-        RoomID: string = ContentJSON.content.RoomID;
+    if(!rooms[RoomID])
+        return sendError(UserID, `Unknown room ${RoomID}.`);
+
+    const isInRoom: boolean = members[UserID].In !== "";
 
     if(isInRoom) 
         return sendError(UserID, `Member ${UserID} is already belong to a room.`);
@@ -508,20 +526,21 @@ registerProtocol("message")
 
 registerProtocol("election")
 ((UserID: string, ContentJSON: sendMessageTypes.election): void => {
-    if(!validateMessage(ContentJSON, { type: "test", content: { MemberID: "test" } }))
+    if(!validateMessage(ContentJSON, { type: "test", content: { Target: "test" } }))
         return sendError(UserID, `Invalid message format for ${ContentJSON.type}.`);
 
     const RoomID: string = members[UserID].In;
     if(!RoomID) 
         return sendError(UserID, `Member ${UserID} does not belong to a room.`);
     
-    const isMemberBelongToRoom = rooms[RoomID].members.includes(ContentJSON.content.MemberID),
-        isMemberAMod = rooms[RoomID].mods.includes(ContentJSON.content.MemberID),
+    const Target: string = ContentJSON.content.Target,
+        isMemberBelongToRoom = rooms[RoomID].members.includes(Target),
+        isMemberAMod = rooms[RoomID].mods.includes(Target),
         doesMemberHasPermission = rooms[RoomID].host == UserID,
         isEligibleForElection = isMemberBelongToRoom && !isMemberAMod && doesMemberHasPermission;
 
     if(isEligibleForElection) {
-        rooms[RoomID].mods.push(ContentJSON.content.MemberID);
+        rooms[RoomID].mods.push(Target);
 
         broadcastToRoom(RoomID, ContentJSON);
 
@@ -529,21 +548,21 @@ registerProtocol("election")
             type: "userElection", 
             content: {
                 RoomID,
-                Target: ContentJSON.content.MemberID
+                Target
             }
         });
-        print(`${ContentJSON.content.MemberID} elected to moderator by the host.`, RoomID);
+        print(`${Target} elected to moderator by the host.`, RoomID);
     }
     else if(!doesMemberHasPermission) 
         sendError(UserID, "Insufficient permission.");
     else if(isMemberAMod)
-        sendError(UserID, `Member ${ContentJSON.content.MemberID} is already a moderator.`);
-    else sendError(UserID, `Unknown member ${ContentJSON.content.MemberID}: Member does not exist or does not belong to this room.`);
+        sendError(UserID, `Member ${Target} is already a moderator.`);
+    else sendError(UserID, `Unknown member ${Target}: Member does not exist or does not belong to this room.`);
 });
 
 registerProtocol("demotion")
 ((UserID: string, ContentJSON: sendMessageTypes.demotion): void => {
-    if(!validateMessage(ContentJSON, { type: "test", content: { MemberID: "test" } })) 
+    if(!validateMessage(ContentJSON, { type: "test", content: { Target: "test" } })) 
         return sendError(UserID, `Invalid message format for ${ContentJSON.type}.`);
     
     const RoomID: string = members[UserID].In;
@@ -551,31 +570,32 @@ registerProtocol("demotion")
     if(!RoomID) 
         return sendError(UserID, `Member ${UserID} does not belong to a room.`);
         
-    const isMemberBelongToRoom: boolean = rooms[RoomID].members.includes(ContentJSON.content.MemberID),
-        isMemberAMod: boolean = rooms[RoomID].mods.includes(ContentJSON.content.MemberID),
+    const Target: string = ContentJSON.content.Target,
+        isMemberBelongToRoom: boolean = rooms[RoomID].members.includes(Target),
+        isMemberAMod: boolean = rooms[RoomID].mods.includes(Target),
         doesMemberHasPermission: boolean = rooms[RoomID].host == UserID,
         isEligibleForDemotion: boolean = isMemberBelongToRoom && isMemberAMod && doesMemberHasPermission;
 
     if(isEligibleForDemotion) {
-        rooms[RoomID].mods.splice(rooms[RoomID].mods.indexOf(ContentJSON.content.MemberID), 1);
+        rooms[RoomID].mods.splice(rooms[RoomID].mods.indexOf(Target), 1);
 
-        broadcastToRoom(RoomID, { type: "demotion", content: ContentJSON.content });
+        broadcastToRoom(RoomID, { type: "demotion", content: { Target } });
 
         broadcastToAdmins({ 
             type: "userDemotion", 
             content: {
                 RoomID,
-                Target: ContentJSON.content.MemberID
+                Target
             } 
         });
 
-        print(`${ContentJSON.content.MemberID} demoted by the host.`, RoomID);
+        print(`${Target} has their moderator privilege revoked by the host.`, RoomID);
     }
     else if(!doesMemberHasPermission) 
         sendError(UserID, "Insufficient permission.");
     else if(!isMemberAMod)
-        sendError(UserID, `Member ${ContentJSON.content.MemberID} is not a moderator.`);
-    else sendError(UserID, `Unknown member ${ContentJSON.content.MemberID}: Member does not exist or does not belong to this room.`);
+        sendError(UserID, `Member ${Target} is not a moderator.`);
+    else sendError(UserID, `Unknown member ${Target}: Member does not exist or does not belong to this room.`);
 });
 
 registerProtocol("pause")
@@ -620,7 +640,7 @@ registerProtocol("adminLogin")
     if(!validateMessage(ContentJSON, { type: "test", content: { Password: "string" } })) 
         return sendError(AdminID, `Invalid message format for ${ContentJSON.type}.`);
 
-    if(adminIDs.includes(AdminID)) 
+    if(members[AdminID].IsAuthorized) 
         return sendError(AdminID, "Already logged in as an admin.");
 
     if(members[AdminID].AdminLoginAttempts > config.MaxAdminLoginAttempts) 
@@ -632,7 +652,8 @@ registerProtocol("adminLogin")
     }
     
     members[AdminID].AdminLoginAttempts = 0;
-    adminIDs.push(AdminID);
+    members[AdminID].IsAuthorized = true;
+    adminLookUp.push(AdminID);
     const membersObj: { [MemberID: string]: { UserName: string, Avt: string } } = {};
 
     for(const memberID in members) {
@@ -657,10 +678,11 @@ registerProtocol("adminLogout")
     if(!validateMessage(ContentJSON, { type: "adminLogout" })) 
         return sendError(AdminID, `Invalid message format for ${ContentJSON.type}.`);
 
-    if(!adminIDs.includes(AdminID)) 
+    if(!members[AdminID].IsAuthorized) 
         return sendError(AdminID, "Not logged in as an admin.");
 
-    adminIDs.splice(adminIDs.indexOf(AdminID), 1);
+    members[AdminID].IsAuthorized = false;
+    adminLookUp.splice(adminLookUp.indexOf(AdminID), 1);
 });
 
 registerProtocol("shutdown")
@@ -668,7 +690,7 @@ registerProtocol("shutdown")
     if(!validateMessage(ContentJSON, { type: "shutdown" }))
         return sendError(AdminID, `Invalid message format for ${ContentJSON.type}.`);
 
-    if(!adminIDs.includes(AdminID)) 
+    if(!members[AdminID].IsAuthorized) 
         return sendError(AdminID, "Insufficient permission.");
 
     close();
@@ -726,7 +748,7 @@ const broadcastToRoom = (RoomID: string, ContentJSON: SendMessageTypes, ...excep
     /**
      * Broacast ContentJSON to all active admin clients.
      */
-    broadcastToAdmins = (ContentJSON: AdminSendMessageTypes): void => adminIDs.forEach((admin) => getSession(admin).send(JSON.stringify(ContentJSON))), 
+    broadcastToAdmins = (ContentJSON: AdminSendMessageTypes): void => adminLookUp.forEach((AdminID: string): void => members[AdminID].Socket.send(JSON.stringify(ContentJSON))),     
     /**
      * Generate a unique UUID base on the prerequisite function, regenerate if prerequisite returns true.
      */

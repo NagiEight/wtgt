@@ -24,14 +24,14 @@ export interface message {
 export interface election {
     type: "election";
     content: {
-        MemberID: string;
+        Target: string;
     };
 }
 
 export interface demotion {
     type: "demotion";
     content: {
-        MemberID: string;
+        Target: string;
     };
 }
 
