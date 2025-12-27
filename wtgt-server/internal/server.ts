@@ -79,7 +79,8 @@ type ContentJSONType =
     | sendMessageTypes.query 
     | adminSendMessageTypes.adminLogin 
     | adminSendMessageTypes.adminLogout 
-    | adminSendMessageTypes.shutdown;
+    | adminSendMessageTypes.shutdown
+;
 
 type SendMessageTypes = 
     | receiveMessageTypes.info 
@@ -93,7 +94,7 @@ type SendMessageTypes =
     | receiveMessageTypes.pause 
     | receiveMessageTypes.sync 
     | receiveMessageTypes.upload
-    ;
+;
 
 type AdminSendMessageTypes = 
     | adminReceiveMessageTypes.adminInit 
@@ -104,12 +105,10 @@ type AdminSendMessageTypes =
     | adminReceiveMessageTypes.userDemotion 
     | adminReceiveMessageTypes.memberLeave 
     | adminReceiveMessageTypes.roomEnd 
-    | adminReceiveMessageTypes.connection;
+    | adminReceiveMessageTypes.connection
+;
 
-export namespace Server {
-    export let config: Config;
-    
-    const getIPs = (req: http.IncomingMessage): string[] => [...(
+const getIPs = (req: http.IncomingMessage): string[] => [...(
             Array.isArray(req.headers["x-forwarded-for"]) ? 
             req.headers["x-forwarded-for"] : 
             (req.headers["x-forwarded-for"] as string || "").replace(/ /g, "").split(",")
@@ -196,8 +195,9 @@ export namespace Server {
             UserName: url.searchParams.get("UserName"),
             Avt: url.searchParams.get("Avt")
         },
-        UserID = generateUniqueUUID((UUID: string): boolean => !members[UUID]);
-    
+        UserID = generateUniqueUUID((UUID: string): boolean => Boolean(members[UUID]));
+        print(`New connection from: ${UserID}.`);
+
         members[UserID] = {
             UserName: userProfile.UserName,
             Avt: userProfile.Avt,
@@ -206,18 +206,18 @@ export namespace Server {
             IsAuthorized: false,
             Socket: client
         };
-    
+
         client.on("close", () => {
             if(members[UserID].IsAuthorized)
                 adminLookUp.splice(adminLookUp.indexOf(UserID), 1);
             print(`${UserID} disconnected.`);
             delete members[UserID];
         });
-    
+
         client.on("message", (data: ws.RawData): void => {
             if(!members[UserID].IsAuthorized) {
                 const addresses: string[] = getIPs(req);
-    
+
                 for(const address of addresses) {
                     if(!allowRequest(address)) {
                         sendError(UserID, "Rate limit exceeded.");
@@ -225,7 +225,7 @@ export namespace Server {
                     }
                 }
             }
-    
+
             let ContentJSON: ContentJSONType;
             try {
                 ContentJSON = JSON.parse(data.toString());
@@ -233,7 +233,7 @@ export namespace Server {
             catch(err) {
                 return sendError(UserID, "Invalid JSON message sent, try again.");
             }
-    
+
             const protocol = protocolRegistry[ContentJSON.type];
             if(!protocol)
                 return sendError(UserID, `Unknown message type: ${ContentJSON.type}.`);
@@ -287,9 +287,10 @@ export namespace Server {
         FlushingIntervalHours: 12,
         BucketCapacity: 2500,
         BucketRefillIntervalHours: 1
-    };
+    }
+;
 
-    export const print = (object: any, RoomID?: string): void => {
+export const print = (object: any, RoomID?: string): void => {
         let toPrint = object;
         if(typeof toPrint !== "string")
             toPrint = util.inspect(object);
@@ -319,29 +320,6 @@ export namespace Server {
     }, 
     registerProtocol = <T extends ContentJSONType>(messageName: string) => (target: (UserID: string, ContentJSON: T) => void): void => 
         (protocolRegistry[messageName] = target) as unknown as void,
-    initializeConfig = async (): Promise<void> => {
-        const propertiesPath: string = "./server-properties";
-        await fs.mkdir(propertiesPath, { recursive: true });
-        const configPath: string = path.join(propertiesPath, "config.json");
-
-        let Output: Config;
-
-        try {
-            const raw: Config = JSON.parse(await fs.readFile(configPath, "utf-8"));
-            Output = sanitizeConfig(raw, defaultConfig);
-        }
-        catch(err) {
-            print(`Error reading config: ${err instanceof Error ? err.message : err}`);
-            Output = structuredClone(defaultConfig);
-        }
-
-        if(Output.PanelPassword === "") {
-            Output.PanelPassword = generatePassword(Output.AdminPasswordLength);
-        }
-
-        await fs.writeFile(configPath, JSON.stringify(Output, null, 4), { encoding: "utf-8" });
-        config = Output;
-    },
     /**
      * Stop the server and write log.
      */
@@ -407,14 +385,37 @@ export namespace Server {
 
         return UUID;
     },
+    config = await (async (): Promise<Config> => {
+        const propertiesPath: string = "./server-properties";
+        await fs.mkdir(propertiesPath, { recursive: true });
+        const configPath: string = path.join(propertiesPath, "config.json");
+
+        let Output: Config;
+
+        try {
+            const raw: Config = JSON.parse(await fs.readFile(configPath, "utf-8"));
+            Output = sanitizeConfig(raw, defaultConfig);
+        }
+        catch(err) {
+            print(`Error reading config: ${err instanceof Error ? err.message : err}`);
+            Output = structuredClone(defaultConfig);
+        }
+
+        if(Output.PanelPassword === "") {
+            Output.PanelPassword = generatePassword(Output.AdminPasswordLength);
+        }
+
+        await fs.writeFile(configPath, JSON.stringify(Output, null, 4), { encoding: "utf-8" });
+        return Output;
+    })(),
     protocolRegistry: { [MessageName: string]: (UserID: string, ContentJSON: ContentJSONType) => void } = {},
     rooms: RoomsObj = {},
     members: MembersObj = {},
     logs: string[] = [],
     adminLookUp: string[] = [],
     server: http.Server<typeof http.IncomingMessage, typeof http.ServerResponse> = http.createServer(serverInternals),
-    wss: ws.WebSocketServer = new ws.WebSocketServer({ server });
+    wss: ws.WebSocketServer = new ws.WebSocketServer({ server })
+;
 
-    wss.on("connection", wssInternals);
-    server.on("error", Server.close);
-}
+wss.on("connection", wssInternals);
+server.on("error", close);
