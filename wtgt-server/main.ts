@@ -31,7 +31,7 @@ Server.registerProtocol("host")
     if(!allowedRoomTypes.includes(RoomType))
         return Server.sendError(UserID, `Unknown room type: ${RoomType}.`);
 
-    const RoomID: string = Server.generateUniqueUUID((UUID: string) => !Server.rooms[UUID]),
+    const RoomID: string = Server.generateUniqueUUID((UUID: string) => Boolean(Server.rooms[UUID])),
         MediaName: string = ContentJSON.content.MediaName,
         IsPaused: boolean = ContentJSON.content.IsPaused;
 
@@ -144,7 +144,7 @@ Server.registerProtocol("leave")
         Server.print(`${UserID} ended their room session.`, RoomID);
         return;
     }
-    //
+    
     const roomMember: string[] = Server.rooms[RoomID].Members;
     roomMember.splice(roomMember.indexOf(UserID), 1);
     Server.broadcastToRoom(RoomID, { type: "leave", content: { MemberID: UserID } });
@@ -298,7 +298,23 @@ Server.registerProtocol("sync")
 
 Server.registerProtocol("upload")
 ((UserID: string, ContentJSON: sendMessageTypes.upload): void => {
+    
+});
 
+Server.registerProtocol("query")
+((UserID: string, ContentJSON: sendMessageTypes.query) => {
+    if(!validateMessage(ContentJSON, { type: "test" })) 
+        Server.sendError(UserID, `Invalid message format for ${ContentJSON.type}.`);
+
+    Server.getSession(UserID).send(JSON.stringify({
+        type: "queryResult",
+        content: Object.fromEntries(
+            Object.keys(Server.rooms).filter(
+                (RoomID: string): boolean => Server.rooms[RoomID].Type === "public").map(
+                    (RoomID: string) => [RoomID, Server.rooms[RoomID]]
+                )
+        )
+    }));
 });
 
 Server.registerProtocol("adminLogin")
@@ -361,8 +377,7 @@ Server.registerProtocol("shutdown")
 
     Server.close();
 });
-
-Server.server.on("error", Server.close);
+    
 process.on("SIGTERM", Server.close);
 process.on("SIGINT", Server.close);
 process.on("SIGHUP", Server.close);

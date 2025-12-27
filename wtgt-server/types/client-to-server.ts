@@ -59,3 +59,7 @@ export interface upload {
         MediaName: string;
     };
 }
+
+export interface query {
+    type: "query";
+}

@@ -7,12 +7,13 @@ import * as ws from "ws";
 
 import { existsSync } from "fs";
 
+import getCurrentTime from "../helpers/getCurrentTime.js";
+import generatePassword from "../helpers/generatePassword.js";
+
 import * as sendMessageTypes from "../types/client-to-server.js";
 import * as adminSendMessageTypes from "../types/admin-to-server.js";
 import * as receiveMessageTypes from "../types/server-to-client.js";
 import * as adminReceiveMessageTypes from "../types/server-to-admin.js";
-import getCurrentTime from "../helpers/getCurrentTime.js";
-import generatePassword from "../helpers/generatePassword.js";
 
 interface RoomsObj {
     [RoomID: string]: {
@@ -75,6 +76,7 @@ type ContentJSONType =
     | sendMessageTypes.pause 
     | sendMessageTypes.sync 
     | sendMessageTypes.upload 
+    | sendMessageTypes.query 
     | adminSendMessageTypes.adminLogin 
     | adminSendMessageTypes.adminLogout 
     | adminSendMessageTypes.shutdown;
@@ -90,7 +92,8 @@ type SendMessageTypes =
     | receiveMessageTypes.end 
     | receiveMessageTypes.pause 
     | receiveMessageTypes.sync 
-    | receiveMessageTypes.upload;
+    | receiveMessageTypes.upload
+    ;
 
 type AdminSendMessageTypes = 
     | adminReceiveMessageTypes.adminInit 
@@ -411,5 +414,7 @@ export namespace Server {
     adminLookUp: string[] = [],
     server: http.Server<typeof http.IncomingMessage, typeof http.ServerResponse> = http.createServer(serverInternals),
     wss: ws.WebSocketServer = new ws.WebSocketServer({ server });
+
     wss.on("connection", wssInternals);
+    server.on("error", Server.close);
 }
