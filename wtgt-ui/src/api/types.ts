@@ -9,18 +9,18 @@
 
 export type ServerMessageType =
   | 'info'
-  | 'error'
-  | 'success'
-  | 'connection'
-  | 'disconnection'
-  | 'roomData'
-  | 'memberJoined'
-  | 'memberLeft'
-  | 'messageReceived'
-  | 'mediaUpdated'
-  | 'playbackStateChanged'
-  | 'modElected'
-  | 'modDemoted'
+  | 'init'
+  | 'join'
+  | 'message'
+  | 'election'
+  | 'demotion'
+  | 'leave'
+  | 'end'
+  | 'pause'
+  | 'sync'
+  | 'upload';
+
+  
 
 export interface ServerMessage<T = unknown> {
   type: ServerMessageType

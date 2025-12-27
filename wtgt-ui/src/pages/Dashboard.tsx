@@ -1,22 +1,22 @@
-import { useState } from 'react'
-import { useNavigate } from 'react-router-dom'
-import { Layout } from '../components/Layout'
-import { CreateRoomModal } from '../components/CreateRoomModal'
-import type { Room } from '../types'
-import { useWebSocket } from '../api'
+import { useState } from "react";
+import { useNavigate } from "react-router-dom";
+import { Layout } from "../components/Layout";
+import { CreateRoomModal } from "../components/CreateRoomModal";
+import type { Room } from "../types";
+import { useWebSocket } from "../api";
 
 export const Dashboard = () => {
-  const { hostRoom } = useWebSocket();
+  const { hostRoom, joinRoom, leaveRoom } = useWebSocket();
 
-  const navigate = useNavigate()
-  const [isModalOpen, setIsModalOpen] = useState(false)
+  const navigate = useNavigate();
+  const [isModalOpen, setIsModalOpen] = useState(false);
   const [rooms, setRooms] = useState<Room[]>([
     {
-      id: 'room-1',
-      name: 'Room name goes here',
-      type: 'public',
-      host: { id: 'user-1', username: 'Name of the host' },
-      currentMedia: 'Starset - VESSLES',
+      id: "room-1",
+      name: "Room name goes here",
+      type: "public",
+      host: { id: "user-1", username: "Name of the host" },
+      currentMedia: "Starset - VESSLES",
       isPaused: false,
       members: [],
       moderators: [],
@@ -24,47 +24,55 @@ export const Dashboard = () => {
       messages: [],
     },
     {
-      id: 'room-2',
-      name: 'Room name goes here',
-      type: 'private',
-      host: { id: 'user-2', username: 'Name of the host' },
-      currentMedia: 'Umamusume - S01E01',
+      id: "room-2",
+      name: "Room name goes here",
+      type: "private",
+      host: { id: "user-2", username: "Name of the host" },
+      currentMedia: "Umamusume - S01E01",
       isPaused: true,
       members: [],
       moderators: [],
       createdAt: new Date(),
       messages: [],
     },
-  ])
+  ]);
 
-  const handleCreateRoom = () => setIsModalOpen(true)
+  const handleCreateRoom = () => setIsModalOpen(true);
 
   const handleCreateRoomSubmit = (roomData: {
-    name: string
-    type: 'public' | 'private'
-    mediaName: string
+    name: string;
+    type: "public" | "private";
+    mediaName: string;
   }) => {
     const newRoom: Room = {
       id: `room-${Date.now()}`,
       name: roomData.name,
       type: roomData.type,
-      host: { id: 'current-user', username: 'You', avatar: '😊' },
+      host: { id: "current-user", username: "You", avatar: "😊" },
       currentMedia: roomData.mediaName,
       isPaused: false,
       members: [],
       moderators: [],
       createdAt: new Date(),
       messages: [],
-    }
+    };
     if (hostRoom) {
       hostRoom(roomData.mediaName, roomData.type, false);
-      console.log('Room hosted successfully');
+      console.log("Room hosted successfully");
     }
-    setRooms([newRoom, ...rooms])
-    setIsModalOpen(false)
-  }
+    setRooms([newRoom, ...rooms]);
+    setIsModalOpen(false);
+  };
 
-  const handleJoinRoom = (roomId: string) => navigate(`/room/${roomId}`)
+  const handleJoinRoom = (roomId: string) => {
+    if (joinRoom) {
+      joinRoom(roomId);
+      navigate(`/room/${roomId}`);
+      console.log("Joined room successfully");
+    }
+  };
+
+  const handleGetRooms = () => {};
 
   return (
     <Layout title="Browsing Rooms">
@@ -98,9 +106,7 @@ export const Dashboard = () => {
                 </div>
                 <span
                   className={`px-3 py-1 rounded-full text-xs font-semibold text-white ${
-                    room.type === 'public'
-                      ? 'bg-primary'
-                      : 'bg-secondary'
+                    room.type === "public" ? "bg-primary" : "bg-secondary"
                   }`}
                 >
                   {room.type}
@@ -112,7 +118,7 @@ export const Dashboard = () => {
                   🎬 {room.currentMedia}
                 </p>
                 <p className="text-xs mt-1 text-content-secondary">
-                  {room.isPaused ? '⏸ Paused' : '▶ Playing'}
+                  {room.isPaused ? "⏸ Paused" : "▶ Playing"}
                 </p>
               </div>
 
@@ -132,5 +138,5 @@ export const Dashboard = () => {
         )}
       </div>
     </Layout>
-  )
-}
+  );
+};
