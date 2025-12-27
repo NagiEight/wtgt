@@ -32,8 +32,7 @@ export const Landing = () => {
 
   const onLoginSuccess = async () => {
     await handleConnect();
-    handleSendMessage();
-    client?.sendMessage("room-123", "Hello after login!");    
+    handleSendMessage(); 
     navigate('/dashboard')
   }
   const handleSubmit = (e: React.FormEvent<HTMLFormElement>) => {
