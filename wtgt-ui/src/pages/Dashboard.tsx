@@ -3,8 +3,11 @@ import { useNavigate } from 'react-router-dom'
 import { Layout } from '../components/Layout'
 import { CreateRoomModal } from '../components/CreateRoomModal'
 import type { Room } from '../types'
+import { useWebSocket } from '../api'
 
 export const Dashboard = () => {
+  const { hostRoom } = useWebSocket();
+
   const navigate = useNavigate()
   const [isModalOpen, setIsModalOpen] = useState(false)
   const [rooms, setRooms] = useState<Room[]>([
@@ -52,6 +55,10 @@ export const Dashboard = () => {
       moderators: [],
       createdAt: new Date(),
       messages: [],
+    }
+    if (hostRoom) {
+      hostRoom(roomData.mediaName, roomData.type, false);
+      console.log('Room hosted successfully');
     }
     setRooms([newRoom, ...rooms])
     setIsModalOpen(false)

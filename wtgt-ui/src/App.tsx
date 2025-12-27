@@ -5,9 +5,11 @@ import { Room } from './pages/Room'
 import { AdminPanel } from './pages/AdminPanel'
 import { Settings } from './pages/Settings'
 import { NotFound } from './pages/NotFound'
+import { WebSocketProvider } from './api'
 
 function App() {
   return (
+    <WebSocketProvider url="ws://localhost:3000/">
       <BrowserRouter>
         <Routes>
           <Route path="/" element={<Landing />} />
@@ -18,6 +20,7 @@ function App() {
           <Route path="*" element={<NotFound />} />
         </Routes>
       </BrowserRouter>
+    </WebSocketProvider>
   )
 }
 

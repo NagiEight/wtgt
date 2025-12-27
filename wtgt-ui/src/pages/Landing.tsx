@@ -1,7 +1,8 @@
-import { useState } from 'react'
+import { use, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useTheme } from '../hooks/useTheme'
 import { ThemeToggle } from '../components/ThemeToggle'
+import { useWebSocketContext,useWebSocketMessage } from '../api'
 
 export const Landing = () => {
   const { isDark } = useTheme()
@@ -11,11 +12,36 @@ export const Landing = () => {
   const [email, setEmail] = useState('')
   const navigate = useNavigate()
 
+  const{client, isConnected,disconnect,connect}=useWebSocketContext();
+
+  useWebSocketMessage('messageReceived',(message)=>{
+    console.log("Received message:", message);
+  });
+
+  const handleConnect=async()=>{
+    try{
+      await connect(username,"👌");
+    }catch(error){
+      console.error("Error connecting:", error);
+    }
+  }
+
+  const handleSendMessage = () => {
+    client?.sendMessage("room-123", "Hello!");
+  };
+
+  const onLoginSuccess = async () => {
+    await handleConnect();
+    handleSendMessage();
+    client?.sendMessage("room-123", "Hello after login!");    
+    navigate('/dashboard')
+  }
   const handleSubmit = (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault()
     // TODO: Handle actual authentication
     if (username && password) {
-      navigate('/dashboard')
+      
+      onLoginSuccess()
     }
   }
 
@@ -74,8 +100,7 @@ export const Landing = () => {
                 placeholder="Enter your password"
                 className="w-full px-4 py-2 rounded-lg border border-default bg-app text-content placeholder-content-secondary transition-colors focus:outline-none focus:ring-2 focus:ring-primary"
               />
-            </div>
-
+            </div>        
             <button
               type="submit"
               className="w-full py-2 rounded-lg font-semibold transition-colors hover:opacity-90 btn-primary"
