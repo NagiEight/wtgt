@@ -100,7 +100,7 @@ export interface queryResult {
         [RoomID: string]: {
             CurrentMedia: string;
             Host: string;
-            Type: "private" | "public";
+            Type: "public";
             IsPaused: boolean;
             Mods: string[];
             Members: string[];
