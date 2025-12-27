@@ -304,16 +304,11 @@ Server.registerProtocol("upload")
 Server.registerProtocol("query")
 ((UserID: string, ContentJSON: sendMessageTypes.query) => {
     if(!validateMessage(ContentJSON, { type: "test" })) 
-        Server.sendError(UserID, `Invalid message format for ${ContentJSON.type}.`);
+        return Server.sendError(UserID, `Invalid message format for ${ContentJSON.type}.`);
 
     Server.getSession(UserID).send(JSON.stringify({
         type: "queryResult",
-        content: Object.fromEntries(
-            Object.keys(Server.rooms).filter(
-                (RoomID: string): boolean => Server.rooms[RoomID].Type === "public").map(
-                    (RoomID: string) => [RoomID, Server.rooms[RoomID]]
-                )
-        )
+        content: Object.fromEntries(Object.keys(Server.rooms).filter((RoomID: string): boolean => Server.rooms[RoomID].Type === "public").map((RoomID: string) => [RoomID, Server.rooms[RoomID]]))
     }));
 });
 

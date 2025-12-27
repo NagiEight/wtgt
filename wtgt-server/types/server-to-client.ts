@@ -93,3 +93,24 @@ export interface upload {
         MediaName: string;
     };
 }
+
+export interface queryResult {
+    type: "queryResult";
+    content: {
+        [RoomID: string]: {
+            CurrentMedia: string;
+            Host: string;
+            Type: "private" | "public";
+            IsPaused: boolean;
+            Mods: string[];
+            Members: string[];
+            Messages: {
+                [MessageID: string]: {
+                    Sender: string;
+                    Text: string;
+                    Timestamp: string;
+                };
+            };
+        }
+    }
+}

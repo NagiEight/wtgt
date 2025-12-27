@@ -1,4 +1,4 @@
-interface adminInit {
+export interface adminInit {
     type: "adminInit";
     content: {
         Logs: string;
@@ -28,7 +28,7 @@ interface adminInit {
     };
 }
 
-interface connection {
+export interface connection {
     type: "connection";
     content: {
         MemberID: string;
@@ -37,14 +37,14 @@ interface connection {
     };
 }
 
-interface log {
+export interface log {
     type: "log";
     content: {
         Text: string;
     };
 }
 
-interface userHost {
+export interface userHost {
     type: "userHost";
     content: {
         RoomID: string;
@@ -54,7 +54,7 @@ interface userHost {
     };
 }
 
-interface userJoin {
+export interface userJoin {
     type: "userJoin";
     content: {
         UserID: string;
@@ -62,7 +62,7 @@ interface userJoin {
     };
 }
 
-interface userElection {
+export interface userElection {
     type: "userElection";
     content: {
         RoomID: string;
@@ -70,7 +70,7 @@ interface userElection {
     };
 }
 
-interface userDemotion {
+export interface userDemotion {
     type: "userDemotion";
     content: {
         RoomID: string;
@@ -78,7 +78,7 @@ interface userDemotion {
     };
 }
 
-interface memberLeave {
+export interface memberLeave {
     type: "memberLeave";
     content: {
         RoomID: string;
@@ -86,21 +86,9 @@ interface memberLeave {
     };
 }
 
-interface roomEnd {
+export interface roomEnd {
     type: "roomEnd";
     content: {
         RoomID: string;
     };
 }
-
-export {
-    adminInit,
-    log,
-    userHost,
-    userJoin,
-    userElection,
-    userDemotion,
-    memberLeave,
-    roomEnd,
-    connection
-};
