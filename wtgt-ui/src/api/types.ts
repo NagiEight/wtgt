@@ -35,16 +35,15 @@ export interface ServerMessage<T = unknown> {
 export type ClientRequestType =
   | 'host'
   | 'join'
-  | 'leave'
-  | 'sendMessage'
-  | 'upload'
-  | 'pause'
-  | 'sync'
+  | 'message'
   | 'election'
   | 'demotion'
-  | 'adminLogin'
-  | 'adminLogout'
-  | 'serverShutdown'
+  | 'leave'
+  | 'pause'
+  | 'sync'
+  | 'upload'
+  | 'query'
+
 
 export interface ClientRequest<T = unknown> {
   type: ClientRequestType
