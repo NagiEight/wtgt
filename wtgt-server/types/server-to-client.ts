@@ -111,6 +111,6 @@ export interface queryResult {
                     Timestamp: string;
                 };
             };
-        }
-    }
+        };
+    };
 }
