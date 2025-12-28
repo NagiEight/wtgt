@@ -3,6 +3,7 @@
  * Handles all WebSocket communication with the server
  */
 
+import type { Room, User, Message } from "../types";
 import type {
   ServerMessage,
   ServerMessageType,
@@ -17,33 +18,35 @@ import type {
   ElectionContent,
   DemotionContent,
   AdminLoginContent,
-} from './types'
+} from "./types";
 
-type MessageHandler = (message: ServerMessage) => void
-type TypedMessageHandler<T> = (content: T) => void
-type ConnectionHandler = () => void
-type DisconnectionHandler = () => void
-type ErrorHandler = (error: Error) => void
+type MessageHandler = (message: ServerMessage) => void;
+type TypedMessageHandler<T> = (content: T) => void;
+type ConnectionHandler = () => void;
+type DisconnectionHandler = () => void;
+type ErrorHandler = (error: Error) => void;
 
 export class WebSocketClient {
-  private ws: WebSocket | null = null
-  private url: string
-  private messageHandlers: Map<ServerMessageType, Set<TypedMessageHandler<any>>> =
-    new Map()
-  private defaultHandlers: Set<MessageHandler> = new Set()
-  private connectionHandlers: Set<ConnectionHandler> = new Set()
-  private disconnectionHandlers: Set<DisconnectionHandler> = new Set()
-  private errorHandlers: Set<ErrorHandler> = new Set()
-  private reconnectAttempts = 0
-  private maxReconnectAttempts = 5
-  private reconnectDelay = 3000
-  private userId: string | null = null
-  private username: string | null = null
-  private avatar: string | null = null
-  private isIntentionallyClosed = false
+  private ws: WebSocket | null = null;
+  private url: string;
+  private messageHandlers: Map<
+    ServerMessageType,
+    Set<TypedMessageHandler<any>>
+  > = new Map();
+  private defaultHandlers: Set<MessageHandler> = new Set();
+  private connectionHandlers: Set<ConnectionHandler> = new Set();
+  private disconnectionHandlers: Set<DisconnectionHandler> = new Set();
+  private errorHandlers: Set<ErrorHandler> = new Set();
+  private reconnectAttempts = 0;
+  private maxReconnectAttempts = 5;
+  private reconnectDelay = 3000;
+  private userId: string | null = null;
+  private username: string | null = null;
+  private avatar: string | null = null;
+  private isIntentionallyClosed = false;
 
   constructor(url: string) {
-    this.url = url
+    this.url = url;
   }
 
   /**
@@ -56,72 +59,73 @@ export class WebSocketClient {
   ): Promise<void> {
     return new Promise((resolve, reject) => {
       try {
-        this.username = username
-        this.avatar = avatar || '😊'
-        this.userId = userId || this.generateUserId()
-        this.isIntentionallyClosed = false
+        this.username = username;
+        this.avatar = avatar || "😊";
+        this.userId = userId || this.generateUserId();
+        this.isIntentionallyClosed = false;
 
-        const wsUrl = new URL(this.url)
-        wsUrl.searchParams.set('UserName', this.username)
-        wsUrl.searchParams.set('Avt', this.avatar)
+        const wsUrl = new URL(this.url);
+        wsUrl.searchParams.set("UserName", this.username);
+        wsUrl.searchParams.set("Avt", this.avatar);
 
-        this.ws = new WebSocket(wsUrl.toString())
+        this.ws = new WebSocket(wsUrl.toString());
 
         this.ws.onopen = () => {
-          console.log('✅ Connected to server')
-          this.reconnectAttempts = 0
-          this.connectionHandlers.forEach((handler) => handler())
-          resolve()
-        }
+          console.log("✅ Connected to server");
+          this.reconnectAttempts = 0;
+          this.connectionHandlers.forEach((handler) => handler());
+          resolve();
+        };
 
         this.ws.onmessage = (event) => {
           try {
-            const message: ServerMessage = JSON.parse(event.data)
-            this.handleMessage(message)
+            const message: ServerMessage = JSON.parse(event.data);
+            this.handleMessage(message);
           } catch (error) {
-            console.error('Failed to parse message:', error)
+            console.error("Failed to parse message:", error);
             this.errorHandlers.forEach((handler) =>
-              handler(
-                new Error('Failed to parse server message')
-              )
-            )
+              handler(new Error("Failed to parse server message"))
+            );
           }
-        }
+        };
 
         this.ws.onerror = (event) => {
-          const error = new Error('WebSocket error')
-          console.error('❌ WebSocket error:', event)
-          this.errorHandlers.forEach((handler) => handler(error))
-          reject(error)
-        }
+          const error = new Error("WebSocket error");
+          console.error("❌ WebSocket error:", event);
+          this.errorHandlers.forEach((handler) => handler(error));
+          reject(error);
+        };
 
         this.ws.onclose = () => {
-          console.log('🔌 Disconnected from server')
-          this.disconnectionHandlers.forEach((handler) => handler())
+          console.log("🔌 Disconnected from server");
+          this.disconnectionHandlers.forEach((handler) => handler());
 
-          if (!this.isIntentionallyClosed && this.reconnectAttempts < this.maxReconnectAttempts) {
-            this.reconnectAttempts++
+          if (
+            !this.isIntentionallyClosed &&
+            this.reconnectAttempts < this.maxReconnectAttempts
+          ) {
+            this.reconnectAttempts++;
             console.log(
               `Attempting to reconnect (${this.reconnectAttempts}/${this.maxReconnectAttempts})...`
-            )
+            );
             setTimeout(() => {
-              this.connect(username, avatar, userId).catch(console.error)
-            }, this.reconnectDelay)
+              this.connect(username, avatar, userId).catch(console.error);
+            }, this.reconnectDelay);
           }
-        }
+        };
       } catch (error) {
-        reject(error)
+        reject(error);
       }
-    })
+    });
   }
 
   /**
    * Disconnect from WebSocket server
    */
   public disconnect(): void {
-    this.isIntentionallyClosed = true
+    this.isIntentionallyClosed = true;
     if (this.ws && this.ws.readyState === WebSocket.OPEN) {
-      this.ws.close()
+      this.ws.close();
     }
   }
 
@@ -129,24 +133,32 @@ export class WebSocketClient {
    * Check if connected
    */
   public isConnected(): boolean {
-    return this.ws !== null && this.ws.readyState === WebSocket.OPEN
+    return this.ws !== null && this.ws.readyState === WebSocket.OPEN;
   }
 
   /**
    * Send a request to the server
    */
-  private sendRequest<T>(type: ClientRequestType, content: T): void {
+  private sendRequest<T>(type: ClientRequestType, content?: T): void {
     if (!this.isConnected()) {
-      throw new Error('WebSocket is not connected')
+      throw new Error("WebSocket is not connected");
+    }
+
+    if (content === undefined) {
+      const request = { type };
+
+      this.ws!.send(JSON.stringify(request));
+      console.log("➡️ Sent request:", request);
+      return;
     }
 
     const request: ClientRequest = {
       type,
       content,
-    }
+    };
 
-    this.ws!.send(JSON.stringify(request))
-    console.log('➡️ Sent request:', request)
+    this.ws!.send(JSON.stringify(request));
+    console.log("➡️ Sent request:", request);
   }
 
   /**
@@ -154,12 +166,12 @@ export class WebSocketClient {
    */
   private handleMessage(message: ServerMessage): void {
     // Call default handlers
-    this.defaultHandlers.forEach((handler) => handler(message))
+    this.defaultHandlers.forEach((handler) => handler(message));
 
     // Call type-specific handlers
-    const typeHandlers = this.messageHandlers.get(message.type)
+    const typeHandlers = this.messageHandlers.get(message.type);
     if (typeHandlers) {
-      typeHandlers.forEach((handler) => handler(message.content))
+      typeHandlers.forEach((handler) => handler(message.content));
     }
   }
 
@@ -171,46 +183,46 @@ export class WebSocketClient {
     handler: TypedMessageHandler<T>
   ): () => void {
     if (!this.messageHandlers.has(type)) {
-      this.messageHandlers.set(type, new Set())
+      this.messageHandlers.set(type, new Set());
     }
-    this.messageHandlers.get(type)!.add(handler)
+    this.messageHandlers.get(type)!.add(handler);
 
     // Return unsubscribe function
     return () => {
-      this.messageHandlers.get(type)?.delete(handler)
-    }
+      this.messageHandlers.get(type)?.delete(handler);
+    };
   }
 
   /**
    * Register a handler for all messages (unfiltered)
    */
   public onMessage(handler: MessageHandler): () => void {
-    this.defaultHandlers.add(handler)
-    return () => this.defaultHandlers.delete(handler)
+    this.defaultHandlers.add(handler);
+    return () => this.defaultHandlers.delete(handler);
   }
 
   /**
    * Register connection handler
    */
   public onConnect(handler: ConnectionHandler): () => void {
-    this.connectionHandlers.add(handler)
-    return () => this.connectionHandlers.delete(handler)
+    this.connectionHandlers.add(handler);
+    return () => this.connectionHandlers.delete(handler);
   }
 
   /**
    * Register disconnection handler
    */
   public onDisconnect(handler: DisconnectionHandler): () => void {
-    this.disconnectionHandlers.add(handler)
-    return () => this.disconnectionHandlers.delete(handler)
+    this.disconnectionHandlers.add(handler);
+    return () => this.disconnectionHandlers.delete(handler);
   }
 
   /**
    * Register error handler
    */
   public onError(handler: ErrorHandler): () => void {
-    this.errorHandlers.add(handler)
-    return () => this.errorHandlers.delete(handler)
+    this.errorHandlers.add(handler);
+    return () => this.errorHandlers.delete(handler);
   }
 
   // =============================================
@@ -220,26 +232,99 @@ export class WebSocketClient {
   /**
    * Host a new room
    */
-  public hostRoom(mediaName: string, roomType: 'private' | 'public', isPaused = false): void {
-    this.sendRequest<HostContent>('host', {
+  public hostRoom(
+    mediaName: string,
+    roomType: "private" | "public",
+    isPaused = false
+  ): void {
+    this.sendRequest<HostContent>("host", {
       MediaName: mediaName,
       RoomType: roomType,
       IsPaused: isPaused,
-    })
+    });
   }
 
   /**
    * Join an existing room
    */
   public joinRoom(roomId: string): void {
-    this.sendRequest<JoinContent>('join', { roomId })
+    this.sendRequest<JoinContent>("join", { roomId });
   }
 
   /**
    * Leave current room
    */
   public leaveRoom(roomId: string): void {
-    this.sendRequest<JoinContent>('leave', { roomId })
+    this.sendRequest<JoinContent>("leave", { roomId });
+  }
+
+  public getRooms(): Promise<Room[]> {
+    console.log("Requesting rooms from server");
+
+    return new Promise((resolve, reject) => {
+      if (!this.ws) {
+        return reject(new Error("WebSocket not connected"));
+      }
+
+      this.sendRequest<{}>("query");
+
+      const handler = (event: MessageEvent) => {
+        try {
+          const data = JSON.parse(event.data);
+          if (data.type === "queryResult" && data.content) {
+            const rooms = this.parseRooms(data.content);
+            console.log("Received rooms:", rooms);
+            this.ws.removeEventListener("message", handler); // cleanup
+            resolve(rooms);
+          } else {
+            console.warn("Unexpected response for getRooms:", data);
+            this.ws.removeEventListener("message", handler);
+            resolve([]);
+          }
+        } catch (err) {
+          this.ws.removeEventListener("message", handler);
+          reject(err);
+        }
+      };
+
+      this.ws.addEventListener("message", handler);
+
+      // Optional timeout
+      setTimeout(() => {
+        this.ws.removeEventListener("message", handler);
+        reject(new Error("Timeout waiting for rooms"));
+      }, 5000);
+    });
+  }
+
+  public parseRooms(content: Record<string, any>): Room[] {
+    return Object.entries(content).map(([roomId, raw]) => {
+      const room: Room = {
+        id: roomId,
+        name: raw.CurrentMedia ?? "Untitled Room", // server doesn’t send a name, fallback
+        type: raw.Type,
+        host: {
+          id: raw.Host,
+          username: raw.Host, // you’ll probably want to look up user info separately
+          avatar: "🙂", // placeholder until you resolve actual user data
+        } as User,
+        currentMedia: raw.CurrentMedia,
+        isPaused: raw.IsPaused,
+        members: raw.Members.map((memberId: string) => ({
+          id: memberId,
+          username: memberId,
+          avatar: "👤",
+        })) as User[],
+        moderators: raw.Mods.map((modId: string) => ({
+          id: modId,
+          username: modId,
+          avatar: "⭐",
+        })) as User[],
+        createdAt: new Date(), // server doesn’t send createdAt, so you may need to add it
+        messages: Object.values(raw.Messages ?? {}) as Message[], // adjust if Messages is keyed
+      };
+      return room;
+    });
   }
 
   // =============================================
@@ -250,10 +335,10 @@ export class WebSocketClient {
    * Send a message to the current room
    */
   public sendMessage(roomId: string, text: string): void {
-    this.sendRequest<SendMessageContent>('sendMessage', {
+    this.sendRequest<SendMessageContent>("message", {
       roomId,
       text,
-    })
+    });
   }
 
   // =============================================
@@ -263,30 +348,38 @@ export class WebSocketClient {
   /**
    * Upload new media to room
    */
-  public uploadMedia(roomId: string, mediaName: string, mediaUrl?: string): void {
-    this.sendRequest<UploadContent>('upload', {
+  public uploadMedia(
+    roomId: string,
+    mediaName: string,
+    mediaUrl?: string
+  ): void {
+    this.sendRequest<UploadContent>("upload", {
       roomId,
       mediaName,
       mediaUrl,
-    })
+    });
   }
 
   /**
    * Pause/resume playback
    */
-  public pausePlayback(roomId: string, isPaused: boolean, currentTime?: number): void {
-    this.sendRequest<PauseContent>('pause', {
+  public pausePlayback(
+    roomId: string,
+    isPaused: boolean,
+    currentTime?: number
+  ): void {
+    this.sendRequest<PauseContent>("pause", {
       roomId,
       isPaused,
       currentTime,
-    })
+    });
   }
 
   /**
    * Sync playback state with server
    */
   public syncPlayback(roomId: string): void {
-    this.sendRequest<SyncContent>('sync', { roomId })
+    this.sendRequest<SyncContent>("sync", { roomId });
   }
 
   // =============================================
@@ -297,20 +390,20 @@ export class WebSocketClient {
    * Elect a member as moderator
    */
   public electModerator(roomId: string, memberId: string): void {
-    this.sendRequest<ElectionContent>('election', {
+    this.sendRequest<ElectionContent>("election", {
       roomId,
       memberId,
-    })
+    });
   }
 
   /**
    * Demote a moderator
    */
   public demoteModerator(roomId: string, memberId: string): void {
-    this.sendRequest<DemotionContent>('demotion', {
+    this.sendRequest<DemotionContent>("demotion", {
       roomId,
       memberId,
-    })
+    });
   }
 
   // =============================================
@@ -321,23 +414,23 @@ export class WebSocketClient {
    * Login as admin
    */
   public adminLogin(password: string): void {
-    this.sendRequest<AdminLoginContent>('adminLogin', {
+    this.sendRequest<AdminLoginContent>("adminLogin", {
       password,
-    })
+    });
   }
 
   /**
    * Logout as admin
    */
   public adminLogout(): void {
-    this.sendRequest<{}>('adminLogout', {})
+    this.sendRequest<{}>("adminLogout", {});
   }
 
   /**
    * Shutdown server (admin only)
    */
   public shutdownServer(): void {
-    this.sendRequest<{}>('serverShutdown', {})
+    this.sendRequest<{}>("shutdown", {});
   }
 
   // =============================================
@@ -352,28 +445,28 @@ export class WebSocketClient {
       userId: this.userId,
       username: this.username,
       avatar: this.avatar,
-    }
+    };
   }
 
   /**
    * Generate a unique user ID
    */
   private generateUserId(): string {
-    return `user-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`
+    return `user-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
   }
 }
 
 // Create singleton instance
-let clientInstance: WebSocketClient | null = null
+let clientInstance: WebSocketClient | null = null;
 
 export function getWebSocketClient(url?: string): WebSocketClient {
   if (!clientInstance) {
-    const wsUrl = url || `ws://${window.location.hostname}:3000`
-    clientInstance = new WebSocketClient(wsUrl)
+    const wsUrl = url || `ws://${window.location.hostname}:3000`;
+    clientInstance = new WebSocketClient(wsUrl);
   }
-  return clientInstance
+  return clientInstance;
 }
 
 export function createWebSocketClient(url: string): WebSocketClient {
-  return new WebSocketClient(url)
+  return new WebSocketClient(url);
 }

@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { Layout } from "../components/Layout";
 import { CreateRoomModal } from "../components/CreateRoomModal";
@@ -6,38 +6,27 @@ import type { Room } from "../types";
 import { useWebSocket } from "../api";
 
 export const Dashboard = () => {
-  const { hostRoom, joinRoom, leaveRoom } = useWebSocket();
+  const { hostRoom, joinRoom, leaveRoom, getRooms, isConnected } =
+    useWebSocket();
 
   const navigate = useNavigate();
   const [isModalOpen, setIsModalOpen] = useState(false);
-  const [rooms, setRooms] = useState<Room[]>([
-    {
-      id: "room-1",
-      name: "Room name goes here",
-      type: "public",
-      host: { id: "user-1", username: "Name of the host" },
-      currentMedia: "Starset - VESSLES",
-      isPaused: false,
-      members: [],
-      moderators: [],
-      createdAt: new Date(),
-      messages: [],
-    },
-    {
-      id: "room-2",
-      name: "Room name goes here",
-      type: "private",
-      host: { id: "user-2", username: "Name of the host" },
-      currentMedia: "Umamusume - S01E01",
-      isPaused: true,
-      members: [],
-      moderators: [],
-      createdAt: new Date(),
-      messages: [],
-    },
-  ]);
+  const [rooms, setRooms] = useState<any[]>([]);
 
+  const handleGetRooms = () => {
+    if (getRooms) {
+      getRooms().then((rooms) => {
+        setRooms(rooms);
+      });
+    }
+  };
   const handleCreateRoom = () => setIsModalOpen(true);
+
+  useEffect(() => {
+    if (isConnected) {
+      handleGetRooms();
+    }
+  }, [isConnected]);
 
   const handleCreateRoomSubmit = (roomData: {
     name: string;
@@ -71,8 +60,6 @@ export const Dashboard = () => {
       console.log("Joined room successfully");
     }
   };
-
-  const handleGetRooms = () => {};
 
   return (
     <Layout title="Browsing Rooms">
