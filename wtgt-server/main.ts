@@ -345,6 +345,7 @@ Server.registerProtocol("adminLogin")
         type: "adminInit", 
         content: {
             Logs: Server.logs.join("\n"),
+            Uptime: Math.floor(process.uptime() * 1000),
             Rooms: Server.rooms,
             Members: membersObj
         }

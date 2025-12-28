@@ -290,7 +290,6 @@ const getIPs = (req: http.IncomingMessage): string[] => [...(
     }
 ;
 
-export const logs: string[] = [];
 export const print = (object: any, RoomID?: string): void => {
         let toPrint = object;
         if(typeof toPrint !== "string")
@@ -414,7 +413,8 @@ export const print = (object: any, RoomID?: string): void => {
     members: MembersObj = {},
     adminLookUp: string[] = [],
     server: http.Server<typeof http.IncomingMessage, typeof http.ServerResponse> = http.createServer(serverInternals),
-    wss: ws.WebSocketServer = new ws.WebSocketServer({ server })
+    wss: ws.WebSocketServer = new ws.WebSocketServer({ server }),
+    logs: string[] = []
 ;
 
 wss.on("connection", wssInternals);
