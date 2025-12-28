@@ -120,6 +120,7 @@ export function useWebSocket(options: UseWebSocketOptions = {}) {
     hostRoom: client?.hostRoom.bind(client),
     joinRoom: client?.joinRoom.bind(client),
     leaveRoom: client?.leaveRoom.bind(client),
+    getRooms: client?.getRooms.bind(client),
 
     // Message operations
     sendMessage: client?.sendMessage.bind(client),

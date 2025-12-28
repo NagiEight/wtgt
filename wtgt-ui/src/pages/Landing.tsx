@@ -1,30 +1,30 @@
-import { use, useState } from 'react'
-import { useNavigate } from 'react-router-dom'
-import { useTheme } from '../hooks/useTheme'
-import { ThemeToggle } from '../components/ThemeToggle'
-import { useWebSocketContext,useWebSocketMessage } from '../api'
+import { use, useState } from "react";
+import { useNavigate } from "react-router-dom";
+import { useTheme } from "../hooks/useTheme";
+import { ThemeToggle } from "../components/ThemeToggle";
+import { useWebSocketContext, useWebSocketMessage } from "../api";
 
 export const Landing = () => {
-  const { isDark } = useTheme()
-  const [isLogin, setIsLogin] = useState(true)
-  const [username, setUsername] = useState('')
-  const [password, setPassword] = useState('')
-  const [email, setEmail] = useState('')
-  const navigate = useNavigate()
+  const { isDark } = useTheme();
+  const [isLogin, setIsLogin] = useState(true);
+  const [username, setUsername] = useState("");
+  const [password, setPassword] = useState("");
+  const [email, setEmail] = useState("");
+  const navigate = useNavigate();
 
-  const{client, isConnected,disconnect,connect}=useWebSocketContext();
+  const { client, isConnected, disconnect, connect } = useWebSocketContext();
 
-  useWebSocketMessage('messageReceived',(message)=>{
+  useWebSocketMessage("message", (message) => {
     console.log("Received message:", message);
   });
 
-  const handleConnect=async()=>{
-    try{
-      await connect(username,"👌");
-    }catch(error){
+  const handleConnect = async () => {
+    try {
+      await connect(username, "👌");
+    } catch (error) {
       console.error("Error connecting:", error);
     }
-  }
+  };
 
   const handleSendMessage = () => {
     client?.sendMessage("room-123", "Hello!");
@@ -32,17 +32,16 @@ export const Landing = () => {
 
   const onLoginSuccess = async () => {
     await handleConnect();
-    handleSendMessage(); 
-    navigate('/dashboard')
-  }
+    handleSendMessage();
+    navigate("/dashboard");
+  };
   const handleSubmit = (e: React.FormEvent<HTMLFormElement>) => {
-    e.preventDefault()
+    e.preventDefault();
     // TODO: Handle actual authentication
     if (username && password) {
-      
-      onLoginSuccess()
+      onLoginSuccess();
     }
-  }
+  };
 
   return (
     <div className="min-h-screen bg-app text-content">
@@ -53,7 +52,7 @@ export const Landing = () => {
       <div className="flex items-center justify-center min-h-screen">
         <div className="p-8 rounded-xl shadow-lg max-w-md w-full animate-fade-in card">
           <h1 className="text-3xl font-bold mb-2 text-center">
-            {isDark ? '🎬' : '💗'} WTGT
+            {isDark ? "🎬" : "💗"} WTGT
           </h1>
           <p className="text-center mb-6 text-content-secondary">
             Watch Together, Get Together
@@ -61,9 +60,7 @@ export const Landing = () => {
 
           <form onSubmit={handleSubmit} className="space-y-4">
             <div>
-              <label className="block text-sm font-medium mb-2">
-                Username
-              </label>
+              <label className="block text-sm font-medium mb-2">Username</label>
               <input
                 type="text"
                 value={username}
@@ -75,9 +72,7 @@ export const Landing = () => {
 
             {!isLogin && (
               <div>
-                <label className="block text-sm font-medium mb-2">
-                  Email
-                </label>
+                <label className="block text-sm font-medium mb-2">Email</label>
                 <input
                   type="email"
                   value={email}
@@ -89,9 +84,7 @@ export const Landing = () => {
             )}
 
             <div>
-              <label className="block text-sm font-medium mb-2">
-                Password
-              </label>
+              <label className="block text-sm font-medium mb-2">Password</label>
               <input
                 type="password"
                 value={password}
@@ -99,12 +92,12 @@ export const Landing = () => {
                 placeholder="Enter your password"
                 className="w-full px-4 py-2 rounded-lg border border-default bg-app text-content placeholder-content-secondary transition-colors focus:outline-none focus:ring-2 focus:ring-primary"
               />
-            </div>        
+            </div>
             <button
               type="submit"
               className="w-full py-2 rounded-lg font-semibold transition-colors hover:opacity-90 btn-primary"
             >
-              {isLogin ? 'Login' : 'Register'}
+              {isLogin ? "Login" : "Register"}
             </button>
           </form>
 
@@ -115,11 +108,11 @@ export const Landing = () => {
             >
               {isLogin
                 ? "Don't have an account? Register"
-                : 'Already have an account? Login'}
+                : "Already have an account? Login"}
             </button>
           </div>
         </div>
       </div>
     </div>
-  )
-}
+  );
+};

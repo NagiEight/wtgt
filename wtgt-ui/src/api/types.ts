@@ -43,7 +43,9 @@ export type ClientRequestType =
   | 'sync'
   | 'upload'
   | 'query'
-
+  | 'adminLogin'
+  | 'adminLogout'
+  | 'shutdown';
 
 export interface ClientRequest<T = unknown> {
   type: ClientRequestType
