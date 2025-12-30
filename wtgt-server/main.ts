@@ -83,21 +83,13 @@ Server.registerProtocol("join")
     Server.rooms[RoomID].Members.push(UserID);
     Server.members[UserID].In = RoomID;
 
-    const currentRoom = Server.rooms[RoomID],
-        membersObj: { [MemberID: string]: { Username: string, Avt: string } } = {};
-
-    for(const memberID of currentRoom.Members) {
-        membersObj[memberID] = {
-            Username: Server.members[memberID].UserName,
-            Avt: Server.members[memberID].Avt
-        };
-    }
+    const currentRoom = Server.rooms[RoomID];
 
     const toSend: { [Props: string]: any } = {
         CurrentMedia: currentRoom.CurrentMedia,
         IsPaused: currentRoom.IsPaused,
         Mods: currentRoom.Mods,
-        Members: membersObj,
+        Members: Object.fromEntries(currentRoom.Members.map((MemberID: string) => [MemberID, { UserName: Server.members[MemberID].UserName, Avt: Server.members[MemberID].Avt }])),
         Messages: currentRoom.Messages
     };
 
@@ -166,10 +158,10 @@ Server.registerProtocol("message")
         return Server.sendError(UserID, `Invalid message format for ${ContentJSON.type}.`);
 
     const RoomID: string = Server.members[UserID].In;
-    if(!Server.members[UserID].In) 
+    if(!RoomID) 
         return Server.sendError(UserID, `Member ${UserID} does not belong to a room.`);
 
-    const MessageID: string = Server.generateUniqueUUID((UUID: string): boolean => !Server.rooms[RoomID].Messages[UUID]),
+    const MessageID: string = Server.generateUniqueUUID((UUID: string): boolean => Boolean(Server.rooms[RoomID].Messages[UUID])),
         Text: string = ContentJSON.content.Text,
         MessageObject = {
             Sender: UserID,
@@ -332,14 +324,6 @@ Server.registerProtocol("adminLogin")
     Server.members[AdminID].AdminLoginAttempts = 0;
     Server.members[AdminID].IsAuthorized = true;
     Server.adminLookUp.push(AdminID);
-    const membersObj: { [MemberID: string]: { UserName: string, Avt: string } } = {};
-
-    for(const memberID in Server.members) {
-        membersObj[memberID] = {
-            UserName: Server.members[memberID].UserName,
-            Avt: Server.members[memberID].Avt
-        };
-    }
 
     Server.getSession(AdminID).send(JSON.stringify({
         type: "adminInit", 
@@ -347,7 +331,7 @@ Server.registerProtocol("adminLogin")
             Logs: Server.logs.join("\n"),
             Uptime: Math.floor(process.uptime() * 1000),
             Rooms: Server.rooms,
-            Members: membersObj
+            Members: Object.fromEntries(Object.keys(Server.members).map((MemberID: string) => [MemberID, { UserName: Server.members[MemberID].UserName, Avt: Server.members[MemberID].Avt }]))
         }
     }));
 });
