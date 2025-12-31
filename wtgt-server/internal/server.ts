@@ -23,6 +23,7 @@ interface RoomsObj {
         IsPaused: boolean;
         Mods: string[];
         Members: string[];
+        Queue: string[];
         Messages: {
             [MessageID: string]: {
                 Sender: string;
@@ -77,6 +78,7 @@ type ContentJSONType =
     | sendMessageTypes.sync 
     | sendMessageTypes.upload 
     | sendMessageTypes.query 
+    | sendMessageTypes.approve
     | adminSendMessageTypes.adminLogin 
     | adminSendMessageTypes.adminLogout 
     | adminSendMessageTypes.shutdown
@@ -94,6 +96,9 @@ type SendMessageTypes =
     | receiveMessageTypes.pause 
     | receiveMessageTypes.sync 
     | receiveMessageTypes.upload
+    | receiveMessageTypes.error
+    | receiveMessageTypes.disconnect
+    | receiveMessageTypes.newMember
 ;
 
 type AdminSendMessageTypes = 
@@ -151,7 +156,8 @@ const getIPs = (req: http.IncomingMessage): string[] => [...(
                 ".svg": "image/svg+xml",
                 ".css": "text/css",
                 ".html": "text/html"
-            };
+            }
+        ;
         fullUrl.pathname = (fullUrl.pathname + "/").replace(/\/+/g, "/");
         const urlParts: string[] = decodeURI(fullUrl.pathname)
             .split("/")
@@ -207,12 +213,22 @@ const getIPs = (req: http.IncomingMessage): string[] => [...(
             Socket: client
         };
 
-        client.on("close", () => {
+        client.on("close", (): void => {
             if(members[UserID].IsAuthorized)
                 adminLookUp.splice(adminLookUp.indexOf(UserID), 1);
 
-            if(members[UserID].In)
-                delete rooms[members[UserID].In];
+            if(members[UserID].In) {
+                const RoomID: string = members[UserID].In;
+                const Room = rooms[RoomID];
+                if(rooms[members[UserID].In].Host === UserID) {
+                    broadcastToRoom(RoomID, { type: "end", content: undefined });
+                    delete rooms[RoomID];
+                }
+                else {
+                    broadcastToRoom(RoomID, { type: "disconnect", content: { MemberID: UserID } });
+                    Room.Members.splice(Room.Members.indexOf(UserID));
+                }
+            }
 
             print(`${UserID} disconnected.`);
             delete members[UserID];
@@ -330,11 +346,9 @@ export const print = (object: any, RoomID?: string): void => {
     close = (): void => {
         wss.clients.forEach((client: ws.WebSocket): void => {
             try {
-                client.close();
-            }
-            catch {
                 client.terminate();
             }
+            catch {}
         });
 
         server.close(writeLog);

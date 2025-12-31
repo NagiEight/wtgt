@@ -43,6 +43,7 @@ Server.registerProtocol("host")
         Host: UserID,
         Type: RoomType as "private" | "public",
         Mods: [],
+        Queue: [],
         Members: [UserID],
         Messages: {}
     }
@@ -71,30 +72,39 @@ Server.registerProtocol("join")
         return Server.sendError(UserID, `Invalid message format for ${ContentJSON.type}.`);
 
     const RoomID: string = ContentJSON.content.RoomID;
-
-    if(!Server.rooms[RoomID])
+    const Room = Server.rooms[RoomID];
+    if(!Room)
         return Server.sendError(UserID, `Unknown room ${RoomID}.`);
 
     const isInRoom: boolean = Server.members[UserID].In !== "";
-
     if(isInRoom) 
         return Server.sendError(UserID, `Member ${UserID} is already belong to a room.`);
 
-    Server.rooms[RoomID].Members.push(UserID);
+    if(Room.Type === "private") {
+        const MemberProfile = Server.members[UserID];
+        Room.Queue.push(UserID);
+        Server.getSession(Room.Host).send(JSON.stringify({
+            type: "newMember", 
+            content: {
+                MemberID: UserID,
+                UserName: MemberProfile.UserName,
+                Avt: MemberProfile.Avt
+            }
+        }));
+        return;
+    }
+
+    Room.Members.push(UserID);
     Server.members[UserID].In = RoomID;
 
-    const currentRoom = Server.rooms[RoomID];
-
     const toSend: { [Props: string]: any } = {
-        CurrentMedia: currentRoom.CurrentMedia,
-        IsPaused: currentRoom.IsPaused,
-        Mods: currentRoom.Mods,
-        Members: Object.fromEntries(currentRoom.Members.map((MemberID: string) => [MemberID, { UserName: Server.members[MemberID].UserName, Avt: Server.members[MemberID].Avt }])),
-        Messages: currentRoom.Messages
+        CurrentMedia: Room.CurrentMedia,
+        IsPaused: Room.IsPaused,
+        Mods: Room.Mods,
+        Members: Object.fromEntries(Room.Members.map((MemberID: string) => [MemberID, { UserName: Server.members[MemberID].UserName, Avt: Server.members[MemberID].Avt }])),
+        Messages: Room.Messages,
+        RoomID: RoomID
     };
-
-    if(Server.rooms[RoomID].Type === "private") 
-        toSend.RoomID = RoomID;
 
     Server.getSession(UserID).send(JSON.stringify({ type: "init", content: toSend }));
 
@@ -264,11 +274,12 @@ Server.registerProtocol("pause")
     const RoomID: string = Server.members[UserID].In;
     if(!RoomID)
         return Server.sendError(UserID, "Not currently in a room.");
-
+    
+    const Room = Server.rooms[RoomID];
     if(UserID !== Server.rooms[RoomID].Host && Server.rooms[RoomID].Type === "public") 
         return Server.sendError(UserID, "Insufficient permission.");
 
-    Server.rooms[RoomID].IsPaused = ContentJSON.content.IsPaused;
+    Room.IsPaused = ContentJSON.content.IsPaused;
     Server.broadcastToRoom(RoomID, ContentJSON);
     Server.print(`${UserID} paused.`, RoomID);
 });
@@ -295,7 +306,7 @@ Server.registerProtocol("upload")
 });
 
 Server.registerProtocol("query")
-((UserID: string, ContentJSON: sendMessageTypes.query) => {
+((UserID: string, ContentJSON: sendMessageTypes.query): void => {
     if(!validateMessage(ContentJSON, { type: "test" })) 
         return Server.sendError(UserID, `Invalid message format for ${ContentJSON.type}.`);
 
@@ -303,6 +314,57 @@ Server.registerProtocol("query")
         type: "queryResult",
         content: Object.fromEntries(Object.keys(Server.rooms).filter((RoomID: string): boolean => Server.rooms[RoomID].Type === "public").map((RoomID: string) => [RoomID, Server.rooms[RoomID]]))
     }));
+});
+
+Server.registerProtocol("approve")
+((UserID: string, ContentJSON: sendMessageTypes.approve): void => {
+    if(validateMessage(ContentJSON, { type: "test", content: { MemberID: "test" } })) 
+        return Server.sendError(UserID, `Invalid message format for ${ContentJSON.type}.`);
+
+    const RoomID: string = Server.members[UserID].In;
+    if(!RoomID)
+        return Server.sendError(UserID, `Member ${UserID} does not belong to a room.`);
+
+    const Room = Server.rooms[RoomID];
+    if(UserID !== Room.Host || !Room.Mods.includes(UserID)) 
+        return Server.sendError(UserID, "Insufficient permission.");
+
+    const MemberID: string = ContentJSON.content.MemberID;
+    if(!Server.members[MemberID])
+        return Server.sendError(UserID, `Member ${MemberID} doesn't exists.`);
+
+    Room.Queue.splice(Room.Queue.indexOf(MemberID), 1);
+    Room.Members.push(UserID);
+    Server.members[UserID].In = RoomID;
+
+    const toSend = {
+        CurrentMedia: Room.CurrentMedia,
+        IsPaused: Room.IsPaused,
+        Mods: Room.Mods,
+        Members: Object.fromEntries(Room.Members.map((MemberID: string) => [MemberID, { UserName: Server.members[MemberID].UserName, Avt: Server.members[MemberID].Avt }])),
+        Messages: Room.Messages,
+        RoomID
+    };
+
+    Server.getSession(UserID).send(JSON.stringify({ type: "init", content: toSend }));
+
+    Server.broadcastToRoom(RoomID, { 
+        type: "join", 
+        content: {
+            UserID,
+            UserName: Server.members[UserID].UserName,
+            Avt: Server.members[UserID].Avt
+        } 
+    }, UserID);
+
+    Server.broadcastToAdmins({ 
+        type: "userJoin", 
+        content: {
+            UserID,
+            Target: RoomID
+        } 
+    });
+    Server.print(`${UserID} joined a room.`, RoomID);
 });
 
 Server.registerProtocol("adminLogin")

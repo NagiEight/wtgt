@@ -63,3 +63,10 @@ export interface upload {
 export interface query {
     type: "query";
 }
+
+export interface approve {
+    type: "approve",
+    content: {
+        MemberID: string;
+    };
+}

@@ -94,6 +94,29 @@ export interface upload {
     };
 }
 
+export interface error {
+    type: "error";
+    content: {
+        Message: string;
+    }
+}
+
+export interface disconnect {
+    type: "disconnect";
+    content: {
+        MemberID: string;
+    };
+}
+
+export interface newMember {
+    type: "newMember";
+    content: {
+        MemberID: string;
+        UserName: string;
+        Avt: string;
+    };
+}
+
 export interface queryResult {
     type: "queryResult";
     content: {
