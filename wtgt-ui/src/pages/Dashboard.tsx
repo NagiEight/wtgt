@@ -28,36 +28,38 @@ export const Dashboard = () => {
     }
   }, [isConnected]);
 
-  const handleCreateRoomSubmit = (roomData: {
+  const handleCreateRoomSubmit = async (roomData: {
     name: string;
     type: "public" | "private";
     mediaName: string;
   }) => {
-    const newRoom: Room = {
-      id: `room-${Date.now()}`,
-      name: roomData.name,
-      type: roomData.type,
-      host: { id: "current-user", username: "You", avatar: "😊" },
-      currentMedia: roomData.mediaName,
-      isPaused: false,
-      members: [],
-      moderators: [],
-      createdAt: new Date(),
-      messages: [],
-    };
     if (hostRoom) {
-      hostRoom(roomData.mediaName, roomData.type, false);
-      console.log("Room hosted successfully");
+      //hostRoom(roomData.mediaName, roomData.type, false);
+      const newRoom = await hostRoom(roomData.mediaName, roomData.type, false);
+      console.log("New room created:", newRoom);
+      // const convertedNewRoom = {
+      //   id: newRoom,
+      //   name: roomData.name,
+      //   type: roomData.type,
+      //   currentMedia: roomData.mediaName,
+      //   isPaused: false,
+      //   host: {
+      //     id: 0,
+      //     username: "You",
+      //     avatar: "🧑‍💻",
+      //   },
+      // };
+      setRooms([...rooms]);
+
+      navigate(`/room/${newRoom}`);
     }
-    setRooms([newRoom, ...rooms]);
     setIsModalOpen(false);
   };
 
   const handleJoinRoom = (roomId: string) => {
     if (joinRoom) {
       joinRoom(roomId);
-      navigate(`/room/${roomId}`);
-      console.log("Joined room successfully");
+      //navigate(`/room/${roomId}`);
     }
   };
 

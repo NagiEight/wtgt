@@ -1,8 +1,8 @@
-import { use, useState } from "react";
+import { use, useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useTheme } from "../hooks/useTheme";
 import { ThemeToggle } from "../components/ThemeToggle";
-import { useWebSocketContext, useWebSocketMessage } from "../api";
+import { useWebSocket } from "../api";
 
 export const Landing = () => {
   const { isDark } = useTheme();
@@ -12,11 +12,7 @@ export const Landing = () => {
   const [email, setEmail] = useState("");
   const navigate = useNavigate();
 
-  const { client, isConnected, disconnect, connect } = useWebSocketContext();
-
-  useWebSocketMessage("message", (message) => {
-    console.log("Received message:", message);
-  });
+  const { connect, isConnected } = useWebSocket();
 
   const handleConnect = async () => {
     try {
@@ -26,14 +22,10 @@ export const Landing = () => {
     }
   };
 
-  const handleSendMessage = () => {
-    client?.sendMessage("room-123", "Hello!");
-  };
-
   const onLoginSuccess = async () => {
-    await handleConnect();
-    handleSendMessage();
-    navigate("/dashboard");
+    if (isConnected) {
+      navigate("/dashboard");
+    }
   };
   const handleSubmit = (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
@@ -42,6 +34,12 @@ export const Landing = () => {
       onLoginSuccess();
     }
   };
+
+  useEffect(() => {
+    if (!isConnected) {
+      handleConnect();
+    }
+  }, [isConnected]);
 
   return (
     <div className="min-h-screen bg-app text-content">

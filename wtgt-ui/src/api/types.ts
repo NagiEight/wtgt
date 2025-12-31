@@ -8,24 +8,22 @@
 // =============================================
 
 export type ServerMessageType =
-  | 'info'
-  | 'init'
-  | 'join'
-  | 'message'
-  | 'election'
-  | 'demotion'
-  | 'leave'
-  | 'end'
-  | 'pause'
-  | 'sync'
-  | 'upload';
-
-  
+  | "info"
+  | "init"
+  | "join"
+  | "message"
+  | "election"
+  | "demotion"
+  | "leave"
+  | "end"
+  | "pause"
+  | "sync"
+  | "upload";
 
 export interface ServerMessage<T = unknown> {
-  type: ServerMessageType
-  content: T
-  timestamp?: number
+  type: ServerMessageType;
+  content: T;
+  timestamp?: number;
 }
 
 // =============================================
@@ -33,23 +31,23 @@ export interface ServerMessage<T = unknown> {
 // =============================================
 
 export type ClientRequestType =
-  | 'host'
-  | 'join'
-  | 'message'
-  | 'election'
-  | 'demotion'
-  | 'leave'
-  | 'pause'
-  | 'sync'
-  | 'upload'
-  | 'query'
-  | 'adminLogin'
-  | 'adminLogout'
-  | 'shutdown';
+  | "host"
+  | "join"
+  | "message"
+  | "election"
+  | "demotion"
+  | "leave"
+  | "pause"
+  | "sync"
+  | "upload"
+  | "query"
+  | "adminLogin"
+  | "adminLogout"
+  | "shutdown";
 
 export interface ClientRequest<T = unknown> {
-  type: ClientRequestType
-  content: T
+  type: ClientRequestType;
+  content: T;
 }
 
 // =============================================
@@ -57,59 +55,76 @@ export interface ClientRequest<T = unknown> {
 // =============================================
 
 export interface HostContent {
-  MediaName: string
-  RoomType: 'private' | 'public'
-  IsPaused: boolean
+  MediaName: string;
+  RoomType: "private" | "public";
+  IsPaused: boolean;
 }
 
 export interface HostResponse {
-  roomId: string
-  success: boolean
+  roomId: string;
+  success: boolean;
 }
 
 // =============================================
 // Join Room
 // =============================================
 
+export interface init {
+  type: "init";
+  content: {
+    CurrentMedia: string;
+    IsPaused: boolean;
+    Host: string;
+    Mods: string[];
+    Members: {
+      [MemberID: string]: {
+        UserName: string;
+        Avt: string;
+      };
+    };
+    Messages: {
+      [MessageID: string]: {
+        Sender: string;
+        Text: string;
+        Timestamp: string;
+      };
+    };
+  };
+}
+
 export interface JoinContent {
-  roomId: string
+  RoomID: string;
 }
 
-export interface JoinResponse {
-  roomId: string
-  currentMedia: string
-  isPaused: boolean
-  host: {
-    id: string
-    username: string
-    avatar?: string
-  }
-  members: Array<{
-    id: string
-    username: string
-    avatar?: string
-  }>
-  moderators: string[]
-  messages: Array<{
-    id: string
-    senderId: string
-    senderUsername: string
-    text: string
-    timestamp: number
-  }>
+export interface message {
+  type: "message";
+  content: {
+    MessageID: string;
+    Sender: string;
+    Text: string;
+    Timestamp: string;
+  };
 }
 
+export interface join {
+  type: "join";
+  content: {
+    UserID: string;
+    UserName: string;
+    Avt: string;
+  };
+}
 // =============================================
 // Leave Room
 // =============================================
 
 export interface LeaveContent {
-  roomId: string
+  roomId: string;
 }
 
 export interface LeaveResponse {
-  success: boolean
-  message: string
+  success: boolean;
+  message: string;
 }
 
 // =============================================
@@ -117,18 +132,14 @@ export interface LeaveResponse {
 // =============================================
 
 export interface SendMessageContent {
-  roomId: string
-  text: string
+  Text: string;
 }
 
 export interface MessageReceivedContent {
-  roomId: string
-  messageId: string
-  senderId: string
-  senderUsername: string
-  senderAvatar?: string
-  text: string
-  timestamp: number
+  messageId: string;
+  sender: string;
+  text: string;
+  timestamp: string;
 }
 
 // =============================================
@@ -136,14 +147,12 @@ export interface MessageReceivedContent {
 // =============================================
 
 export interface UploadContent {
-  roomId: string
-  mediaName: string
-  mediaUrl?: string
+  mediaName: string;
 }
 
 export interface UploadResponse {
-  success: boolean
-  mediaName: string
+  success: boolean;
+  mediaName: string;
 }
 
 // =============================================
@@ -151,20 +160,20 @@ export interface UploadResponse {
 // =============================================
 
 export interface PauseContent {
-  roomId: string
-  isPaused: boolean
-  currentTime?: number
+  roomId: string;
+  isPaused: boolean;
+  currentTime?: number;
 }
 
 export interface SyncContent {
-  roomId: string
+  roomId: string;
 }
 
 export interface PlaybackStateChangedContent {
-  roomId: string
-  isPaused: boolean
-  currentTime?: number
-  changedBy: string
+  roomId: string;
+  isPaused: boolean;
+  currentTime?: number;
+  changedBy: string;
 }
 
 // =============================================
@@ -172,25 +181,25 @@ export interface PlaybackStateChangedContent {
 // =============================================
 
 export interface ElectionContent {
-  roomId: string
-  memberId: string
+  roomId: string;
+  memberId: string;
 }
 
 export interface DemotionContent {
-  roomId: string
-  memberId: string
+  roomId: string;
+  memberId: string;
 }
 
 export interface MemberJoinedContent {
-  roomId: string
-  memberId: string
-  memberUsername: string
-  memberAvatar?: string
+  roomId: string;
+  memberId: string;
+  memberUsername: string;
+  memberAvatar?: string;
 }
 
 export interface MemberLeftContent {
-  roomId: string
-  memberId: string
+  roomId: string;
+  memberId: string;
 }
 
 // =============================================
@@ -198,12 +207,12 @@ export interface MemberLeftContent {
 // =============================================
 
 export interface AdminLoginContent {
-  password: string
+  password: string;
 }
 
 export interface AdminLoginResponse {
-  success: boolean
-  adminId: string
+  success: boolean;
+  adminId: string;
 }
 
 export interface AdminLogoutContent {
@@ -215,9 +224,9 @@ export interface AdminLogoutContent {
 // =============================================
 
 export interface ErrorContent {
-  message: string
-  code?: string
-  details?: unknown
+  message: string;
+  code?: string;
+  details?: unknown;
 }
 
 // =============================================
@@ -225,11 +234,11 @@ export interface ErrorContent {
 // =============================================
 
 export interface ConnectionContent {
-  userId: string
-  username: string
-  avatar?: string
+  userId: string;
+  username: string;
+  avatar?: string;
 }
 
 export interface InfoContent {
-  roomId: string
+  roomId: string;
 }

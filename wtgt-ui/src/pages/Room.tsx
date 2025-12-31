@@ -1,40 +1,182 @@
-import { useParams } from 'react-router-dom'
-import { useState } from 'react'
-import { Layout } from '../components/Layout'
-import type { Message } from '../types'
+import { useParams } from "react-router-dom";
+import { useState, useEffect } from "react";
+import { Layout } from "../components/Layout";
+import type { Message, RoomMember } from "../types";
+import { useWebSocketContext, useWebSocketMessage, useWebSocket } from "../api";
+import type {
+  MessageReceivedContent,
+  PlaybackStateChangedContent,
+  MemberLeftContent,
+} from "../api";
+import type { init, join, message } from "../api/types";
 
 export const Room = () => {
-  const { roomId } = useParams<{ roomId: string }>()
-  const [messages, setMessages] = useState<Message[]>([
-    {
-      id: '1',
-      sender: {
-        id: 'user-1',
-        username: 'Alice',
-        avatar: '👩',
-      },
-      text: 'This movie is amazing!',
-      timestamp: new Date(Date.now() - 60000),
-    },
-  ])
-  const [messageInput, setMessageInput] = useState('')
+  const { roomId } = useParams<{ roomId: string }>();
+  const { client, isConnected, connect } = useWebSocketContext();
+  const [messages, setMessages] = useState<Message[]>([]);
+  const [messageInput, setMessageInput] = useState("");
+  const [currentMedia, setCurrentMedia] = useState("");
+  const [isPaused, setIsPaused] = useState(false);
+  const [members, setMembers] = useState<RoomMember[]>([]);
+
+  const { uploadMedia } = useWebSocket();
 
   const handleSendMessage = (e: React.FormEvent<HTMLFormElement>) => {
-    e.preventDefault()
-    if (messageInput.trim()) {
-      const newMessage: Message = {
-        id: String(messages.length + 1),
-        sender: {
-          id: 'current-user',
-          username: 'You',
-          avatar: '😊',
-        },
-        text: messageInput,
-        timestamp: new Date(),
-      }
-      setMessages([...messages, newMessage])
-      setMessageInput('')
+    e.preventDefault();
+    if (messageInput.trim() && client) {
+      client.sendMessage(messageInput);
+      setMessageInput("");
+
+      const content = {
+        MessageID: "temp-id-" + Date.now(),
+        Sender: "current-user",
+        Text: messageInput,
+        Timestamp: new Date().toISOString(),
+      };
+      setMessages((prev) => [
+        parseMessagesFromMessageRequest({ type: "message", content }),
+        ...prev,
+      ]);
     }
+  };
+  useEffect(() => {
+    if (!isConnected && client) {
+      const username = localStorage.getItem("username") || "Anonymous";
+      const avatar = localStorage.getItem("avatar") || "😊";
+      connect(username, avatar);
+    }
+  }, [isConnected, client, connect]);
+
+  useEffect(() => {
+    const joinRoom = async () => {
+      if (!isConnected) {
+        await connect("Anonymous", "😊");
+      }
+      if (isConnected && client && roomId) {
+        client.joinRoom(roomId);
+      }
+    };
+    joinRoom();
+  }, [isConnected, client, roomId, connect]);
+
+  useEffect(() => {
+    return () => {
+      setMessages([]);
+    };
+  }, [roomId]);
+
+  function parseMembersFromInitRequest(init: init): RoomMember[] {
+    const { Members, Host, Mods } = init.content;
+
+    return Object.entries(Members).map(([id, { UserName, Avt }]) => {
+      let role: RoomMember["role"] = "member";
+
+      if (id === Host) {
+        role = "host";
+      } else if (Mods.includes(id)) {
+        role = "moderator";
+      }
+
+      return {
+        id,
+        username: UserName,
+        avatar: Avt,
+        role,
+      };
+    });
+  }
+
+  function parseMessagesFromMessageRequest(message: message): Message {
+    const { MessageID, Sender, Text, Timestamp } = message.content;
+    return {
+      id: MessageID,
+      sender: Sender,
+      text: Text,
+      timestamp: Timestamp,
+    };
+  }
+
+  function parseMessagesFromMessageReceivedContent(
+    message: MessageReceivedContent
+  ): Message {
+    const { messageId, text, timestamp, sender } = message;
+    return {
+      id: messageId,
+      sender: sender,
+      text: text,
+      timestamp: timestamp,
+    };
+  }
+
+  function parseMembersFromJoinRequest(
+    join: join,
+    members: RoomMember[]
+  ): RoomMember[] {
+    console.log("Parsing join request:", join);
+    const { UserID, UserName, Avt } = join.content;
+
+    // Build a quick lookup for roles
+    const hostId = members.find((m) => m.role === "host")?.id;
+    const modIds = members
+      .filter((m) => m.role === "moderator")
+      .map((m) => m.id);
+
+    let role: RoomMember["role"] = "member";
+    if (UserID === hostId) {
+      role = "host";
+    } else if (modIds.includes(UserID)) {
+      role = "moderator";
+    }
+
+    return [
+      {
+        id: UserID,
+        username: UserName,
+        avatar: Avt,
+        role,
+      },
+    ];
+  }
+
+  useWebSocketMessage<init>("init", (content) => {
+    setCurrentMedia(content.content.CurrentMedia);
+    setIsPaused(content.content.IsPaused);
+    setMembers(parseMembersFromInitRequest(content));
+  });
+
+  // Handle incoming messages
+  useWebSocketMessage<MessageReceivedContent>("message", (content) => {
+    setMessages((prev) => [
+      ...prev,
+      parseMessagesFromMessageReceivedContent(content),
+    ]);
+  });
+
+  // Handle playback changes
+  useWebSocketMessage<PlaybackStateChangedContent>("pause", (content) => {
+    setIsPaused(content.isPaused);
+  });
+
+  // Handle member joined
+  useWebSocketMessage<join>("join", (content) => {
+    setMembers((prev) => [
+      ...prev,
+      parseMembersFromJoinRequest(content, prev)[0],
+    ]);
+  });
+
+  // Handle member left
+  useWebSocketMessage<MemberLeftContent>("leave", (content) => {
+    setMembers((prev) => prev.filter((m) => m.id !== content.memberId));
+  });
+  function handlePlayPause(event: React.MouseEvent<HTMLButtonElement>): void {
+    setIsPaused((prev) => !prev);
+  }
+
+  function handleUploadMedia(arg0: string): void {
+    if (roomId === undefined || !uploadMedia) return;
+    setCurrentMedia(arg0);
+    uploadMedia(roomId);
   }
 
   return (
@@ -48,7 +190,7 @@ export const Room = () => {
                 <p className="text-4xl mb-4">🎬</p>
                 <p className="text-lg font-semibold">Video Player</p>
                 <p className="text-sm mt-2 text-content-secondary">
-                  Coming soon...
+                  {currentMedia || "Waiting for media..."}
                 </p>
               </div>
             </div>
@@ -57,13 +199,16 @@ export const Room = () => {
           {/* Controls */}
           <div className="p-4 rounded-xl border border-default card">
             <div className="flex gap-4">
-              <button className="flex-1 py-2 rounded-lg font-semibold transition-colors btn-secondary">
-                ▶ Play
+              <button
+                onClick={handlePlayPause}
+                className="flex-1 py-2 rounded-lg font-semibold transition-colors btn-secondary"
+              >
+                {isPaused ? "▶ Play" : "⏸ Pause"}
               </button>
-              <button className="flex-1 py-2 rounded-lg font-semibold transition-colors btn-secondary">
-                ⏸ Pause
-              </button>
-              <button className="flex-1 py-2 rounded-lg font-semibold transition-colors btn-secondary">
+              <button
+                onClick={() => handleUploadMedia("new-media.mp4")}
+                className="flex-1 py-2 rounded-lg font-semibold transition-colors btn-secondary"
+              >
                 ⬆ Upload Media
               </button>
             </div>
@@ -73,7 +218,7 @@ export const Room = () => {
           <div className="p-4 rounded-xl border border-default card grid grid-cols-3 gap-4">
             <div>
               <p className="text-sm opacity-75">Members</p>
-              <p className="text-2xl font-bold">12</p>
+              <p className="text-2xl font-bold">{members.length}</p>
             </div>
             <div>
               <p className="text-sm opacity-75">Moderators</p>
@@ -97,12 +242,10 @@ export const Room = () => {
             {messages.map((msg) => (
               <div key={msg.id} className="space-y-1">
                 <div className="flex items-center gap-2">
-                  <span>{msg.sender.avatar}</span>
-                  <span className="font-semibold text-sm">
-                    {msg.sender.username}
-                  </span>
+                  {/* <span>👌</span> */}
+                  <span className="font-semibold text-sm">{msg.sender}</span>
                   <span className="text-xs text-content-secondary">
-                    {msg.timestamp.toLocaleTimeString()}
+                    {msg.timestamp}
                   </span>
                 </div>
                 <p className="text-sm break-words">{msg.text}</p>
@@ -111,7 +254,10 @@ export const Room = () => {
           </div>
 
           {/* Message Input */}
-          <form onSubmit={handleSendMessage} className="p-4 border-t border-default">
+          <form
+            onSubmit={handleSendMessage}
+            className="p-4 border-t border-default"
+          >
             <div className="flex gap-2">
               <input
                 type="text"
@@ -131,5 +277,5 @@ export const Room = () => {
         </div>
       </div>
     </Layout>
-  )
-}
+  );
+};

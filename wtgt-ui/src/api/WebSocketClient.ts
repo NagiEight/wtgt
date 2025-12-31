@@ -56,7 +56,7 @@ export class WebSocketClient {
     username: string,
     avatar?: string,
     userId?: string
-  ): Promise<void> {
+  ): Promise<boolean> {
     return new Promise((resolve, reject) => {
       try {
         this.username = username;
@@ -74,18 +74,19 @@ export class WebSocketClient {
           console.log("✅ Connected to server");
           this.reconnectAttempts = 0;
           this.connectionHandlers.forEach((handler) => handler());
-          resolve();
         };
 
         this.ws.onmessage = (event) => {
           try {
             const message: ServerMessage = JSON.parse(event.data);
             this.handleMessage(message);
+            resolve(true);
           } catch (error) {
             console.error("Failed to parse message:", error);
             this.errorHandlers.forEach((handler) =>
               handler(new Error("Failed to parse server message"))
             );
+            reject(false);
           }
         };
 
@@ -236,11 +237,43 @@ export class WebSocketClient {
     mediaName: string,
     roomType: "private" | "public",
     isPaused = false
-  ): void {
-    this.sendRequest<HostContent>("host", {
-      MediaName: mediaName,
-      RoomType: roomType,
-      IsPaused: isPaused,
+  ): Promise<string> {
+    console.log("Hosting room on server");
+
+    return new Promise((resolve, reject) => {
+      this.sendRequest<HostContent>("host", {
+        MediaName: mediaName,
+        RoomType: roomType,
+        IsPaused: isPaused,
+      });
+
+      const handler = (event: MessageEvent) => {
+        try {
+          const data = JSON.parse(event.data);
+          if (data.type === "info" && data.content) {
+            console.log("Room hosted:", data.content);
+            this.ws?.removeEventListener("message", handler); // cleanup
+            resolve(data.content.RoomID as string);
+          }
+        } catch (err) {
+          this.ws?.removeEventListener("message", handler);
+          console.error("Error handling hostResult:", err);
+          resolve("");
+        }
+      };
+      if (!this.ws) {
+        throw new Error("WebSocket not connected");
+      }
+      this.ws.addEventListener("message", handler);
+
+      // Optional timeout
+      setTimeout(() => {
+        if (!this.ws) {
+          throw new Error("WebSocket not connected");
+        }
+        this.ws.removeEventListener("message", handler);
+        reject(new Error("Timeout waiting for rooms"));
+      }, 5000);
     });
   }
 
@@ -248,14 +281,30 @@ export class WebSocketClient {
    * Join an existing room
    */
   public joinRoom(roomId: string): void {
-    this.sendRequest<JoinContent>("join", { roomId });
+    this.sendRequest<JoinContent>("join", { RoomID: roomId });
+
+    const handler = (event: MessageEvent) => {
+      console.log("Handling joinRoom response:", JSON.parse(event.data));
+      try {
+        const data = JSON.parse(event.data);
+        if (data.type === "info" && data.content) {
+          console.log("Joined room:", data.content);
+          this.ws?.removeEventListener("message", handler); // cleanup
+        }
+      } catch (err) {
+        this.ws?.removeEventListener("message", handler);
+        console.error("Error handling joinResult:", err);
+      }
+    };
+
+    this.ws?.addEventListener("message", handler);
   }
 
   /**
    * Leave current room
    */
   public leaveRoom(roomId: string): void {
-    this.sendRequest<JoinContent>("leave", { roomId });
+    this.sendRequest<JoinContent>("leave", { RoomID: roomId });
   }
 
   public getRooms(): Promise<Room[]> {
@@ -270,6 +319,9 @@ export class WebSocketClient {
 
       const handler = (event: MessageEvent) => {
         try {
+          if (!this.ws) {
+            return reject(new Error("WebSocket not connected"));
+          }
           const data = JSON.parse(event.data);
           if (data.type === "queryResult" && data.content) {
             const rooms = this.parseRooms(data.content);
@@ -282,6 +334,9 @@ export class WebSocketClient {
             resolve([]);
           }
         } catch (err) {
+          if (!this.ws) {
+            return reject(new Error("WebSocket not connected"));
+          }
           this.ws.removeEventListener("message", handler);
           reject(err);
         }
@@ -291,6 +346,9 @@ export class WebSocketClient {
 
       // Optional timeout
       setTimeout(() => {
+        if (!this.ws) {
+          return reject(new Error("WebSocket not connected"));
+        }
         this.ws.removeEventListener("message", handler);
         reject(new Error("Timeout waiting for rooms"));
       }, 5000);
@@ -334,11 +392,24 @@ export class WebSocketClient {
   /**
    * Send a message to the current room
    */
-  public sendMessage(roomId: string, text: string): void {
+  public sendMessage(Text: string): void {
     this.sendRequest<SendMessageContent>("message", {
-      roomId,
-      text,
+      Text,
     });
+
+    const handler = (event: MessageEvent) => {
+      try {
+        const data = JSON.parse(event.data);
+        if (data.type === "messageAck" && data.content) {
+          console.log("Message sent:", data.content);
+          this.ws?.removeEventListener("message", handler); // cleanup
+        }
+      } catch (err) {
+        this.ws?.removeEventListener("message", handler);
+        console.error("Error handling messageAck:", err);
+      }
+    };
+    this.ws?.addEventListener("message", handler);
   }
 
   // =============================================
@@ -348,16 +419,24 @@ export class WebSocketClient {
   /**
    * Upload new media to room
    */
-  public uploadMedia(
-    roomId: string,
-    mediaName: string,
-    mediaUrl?: string
-  ): void {
+  public uploadMedia(mediaName: string): void {
     this.sendRequest<UploadContent>("upload", {
-      roomId,
       mediaName,
-      mediaUrl,
     });
+
+    // Handle upload progress
+    const handler = (event: MessageEvent) => {
+      try {
+        const data = JSON.parse(event.data);
+        if (data.type === "upload" && data.content) {
+          console.log("Upload progress:", data.content);
+          // You can add more detailed progress handling here if needed
+        }
+      } catch (err) {
+        console.error("Error handling upload:", err);
+      }
+    };
+    this.ws?.addEventListener("message", handler);
   }
 
   /**
