@@ -302,7 +302,18 @@ Server.registerProtocol("sync")
 
 Server.registerProtocol("upload")
 ((UserID: string, ContentJSON: sendMessageTypes.upload): void => {
-    
+    if(!validateMessage(ContentJSON, { type: "upload", content: { MediaName: "" } }))
+        return Server.sendError(UserID, `Invalid message format for ${ContentJSON.type}.`);
+
+    const RoomID: string = Server.members[UserID].In;
+    if(!RoomID)
+        return Server.sendError(UserID, `Member ${UserID} does not belong to a room.`);
+
+    if(UserID !== Server.rooms[RoomID].Host) 
+        return Server.sendError(UserID, "Insufficient permission.");
+
+    Server.rooms[RoomID].CurrentMedia = ContentJSON.content.MediaName;
+    Server.broadcastToRoom(RoomID, ContentJSON);
 });
 
 Server.registerProtocol("query")
@@ -427,22 +438,20 @@ process.on("SIGHUP", Server.close);
 process.on("uncaughtException", Server.close);
 process.on("unhandledRejection", Server.close);
 
-await (async () => {
-    Server.server.listen(Server.config.PORT, () => {
-        Server.print(`Hello World! Server's running at port ${Server.config.PORT}.`);
-        if(Server.config.RegeneratePassword) {
-            setInterval(async () => {
-                Server.config.PanelPassword = generatePassword(Server.config.AdminPasswordLength, Server.config.PanelPassword);
-                await fs.writeFile(path.join("./server-properties", "config.json"), JSON.stringify(Server.config, null, 4), { encoding: "utf-8" });
-                Server.print(`Password resetted. Current Admin panel password is: ${Server.config.PanelPassword}`);
-            }, Server.hoursToMs(Server.config.PasswordRegenerationIntervalHours));
-        }
-        if(Server.config.ServerTerminalFlushing) {
-            setInterval(async () => {
-                await Server.writeLog();
-                console.clear();
-                Server.print(`Current Admin panel password is: ${Server.config.PanelPassword}`);
-            }, Server.hoursToMs(Server.config.FlushingIntervalHours));
-        }
-    });
-})();
+Server.server.listen(Server.config.PORT, () => {
+    Server.print(`Hello World! Server's running at port ${Server.config.PORT}.`);
+    if(Server.config.RegeneratePassword) {
+        setInterval(async () => {
+            Server.config.PanelPassword = generatePassword(Server.config.AdminPasswordLength, Server.config.PanelPassword);
+            await fs.writeFile(path.join("./server-properties", "config.json"), JSON.stringify(Server.config, null, 4), { encoding: "utf-8" });
+            Server.print(`Password resetted. Current Admin panel password is: ${Server.config.PanelPassword}`);
+        }, Server.hoursToMs(Server.config.PasswordRegenerationIntervalHours));
+    }
+    if(Server.config.ServerTerminalFlushing) {
+        setInterval(async () => {
+            await Server.writeLog();
+            console.clear();
+            Server.print(`Current Admin panel password is: ${Server.config.PanelPassword}`);
+        }, Server.hoursToMs(Server.config.FlushingIntervalHours));
+    }
+});
