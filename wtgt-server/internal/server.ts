@@ -210,6 +210,10 @@ const getIPs = (req: http.IncomingMessage): string[] => [...(
         client.on("close", () => {
             if(members[UserID].IsAuthorized)
                 adminLookUp.splice(adminLookUp.indexOf(UserID), 1);
+
+            if(members[UserID].In)
+                delete rooms[members[UserID].In];
+
             print(`${UserID} disconnected.`);
             delete members[UserID];
         });
