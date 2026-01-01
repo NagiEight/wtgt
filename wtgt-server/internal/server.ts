@@ -8,12 +8,13 @@ import * as ws from "ws";
 import { existsSync } from "fs";
 
 import getCurrentTime from "../helpers/getCurrentTime.js";
-import generatePassword from "../helpers/generatePassword.js";
 
 import * as sendMessageTypes from "../types/client-to-server.js";
 import * as adminSendMessageTypes from "../types/admin-to-server.js";
 import * as receiveMessageTypes from "../types/server-to-client.js";
 import * as adminReceiveMessageTypes from "../types/server-to-admin.js";
+import * as db from "./dbManager.js";
+import { ChildProcessWithoutNullStreams } from "child_process";
 
 interface RoomsObj {
     [RoomID: string]: {
@@ -49,9 +50,6 @@ interface Config {
     AdminPasswordLength: number;
     MaxAdminLoginAttempts: number;
     PORT: number;
-    PanelPassword: string;
-    RegeneratePassword: boolean;
-    PasswordRegenerationIntervalHours: number;
     ServerTerminalFlushing: boolean;
     FlushingIntervalHours: number;
     BucketCapacity: number;
@@ -234,7 +232,7 @@ const getIPs = (req: http.IncomingMessage): string[] => [...(
             delete members[UserID];
         });
 
-        client.on("message", (data: ws.RawData): void => {
+        client.on("message", async (data: ws.RawData): Promise<void> => {
             if(!members[UserID].IsAuthorized) {
                 const addresses: string[] = getIPs(req);
 
@@ -257,7 +255,7 @@ const getIPs = (req: http.IncomingMessage): string[] => [...(
             const protocol = protocolRegistry[ContentJSON.type];
             if(!protocol)
                 return sendError(UserID, `Unknown message type: ${ContentJSON.type}.`);
-            protocol(UserID, ContentJSON);
+           await protocol(UserID, ContentJSON);
         });
     },
     sanitizeConfig = <T>(input: unknown, template: T): T => {
@@ -281,8 +279,15 @@ const getIPs = (req: http.IncomingMessage): string[] => [...(
         async (parts: string[], url: URL): Promise<string | null> => {
             if(parts[1] !== "admin" || parts[2] !== "panel")
                 return null;
-            if(url.searchParams.get("p") !== config.PanelPassword)
+            try {
+                let AdminProfile = await db.query(url.searchParams.get("u"));
+                if(url.searchParams.get("p") !== AdminProfile.Profile.Password || !AdminProfile.Approved) {
+                    return "403";
+                }
+            }
+            catch {
                 return "403";
+            }
             if(parts.length === 4)
                 return path.join("admin", "panel", "panel.html");
             if(parts.length === 5)
@@ -300,9 +305,6 @@ const getIPs = (req: http.IncomingMessage): string[] => [...(
         AdminPasswordLength: 16,
         MaxAdminLoginAttempts: 5,
         PORT: 3000,
-        PanelPassword: "",
-        RegeneratePassword: true,
-        PasswordRegenerationIntervalHours: 12,
         ServerTerminalFlushing: true,
         FlushingIntervalHours: 12,
         BucketCapacity: 2500,
@@ -310,11 +312,16 @@ const getIPs = (req: http.IncomingMessage): string[] => [...(
     }
 ;
 
-export const print = (object: any, RoomID?: string): void => {
+let monitorableTerm_: ChildProcessWithoutNullStreams;
+
+export const monitorableTerm = (term: ChildProcessWithoutNullStreams): void => {
+        monitorableTerm_ = term;
+    },
+    print = (object: any, RoomID?: string): void => {
         let toPrint = object;
         if(typeof toPrint !== "string")
             toPrint = util.inspect(object);
-        console.log(`${util.styleText("yellowBright", `[${getCurrentTime()}]`)}${RoomID ? `${util.styleText("greenBright", `{${RoomID}}`)}` : ""} ${toPrint}`);
+        monitorableTerm_.stdin.write(`${util.styleText("yellowBright", `[${getCurrentTime()}]`)}${RoomID ? `${util.styleText("greenBright", `{${RoomID}}`)}` : ""} ${toPrint}`)
         logs.push(`[${getCurrentTime()}]${RoomID ? `{${RoomID}}` : ""} ${toPrint}`);
     },
     hoursToMs = (time: number): number => time * 3600000,
@@ -338,7 +345,7 @@ export const print = (object: any, RoomID?: string): void => {
         bucket.Tokens -= 1;
         return true;
     }, 
-    registerProtocol = <T extends ContentJSONType>(messageName: string) => (target: (UserID: string, ContentJSON: T) => void): void => 
+    registerProtocol = <T extends ContentJSONType>(messageName: string) => (target: (UserID: string, ContentJSON: T) => Promise<void>): void => 
         (protocolRegistry[messageName] = target) as unknown as void,
     /**
      * Stop the server and write log.
@@ -373,7 +380,7 @@ export const print = (object: any, RoomID?: string): void => {
      * Write server's log to a file and empty the log array.
      */
     writeLog = async (): Promise<void> => { 
-        await fs.writeFile(path.join("logs", generateUniqueUUID((UUID: string): boolean => existsSync(path.join("logs", `${UUID}.log`)))), logs.join("\n"), { encoding: "utf-8" });
+        await fs.writeFile(path.join("logs", `${generateUniqueUUID((UUID: string): boolean => existsSync(path.join("logs", `${UUID}.log`)))}.log`), logs.join("\n"), { encoding: "utf-8" });
         logs.length = 0;
     },
     /**
@@ -406,6 +413,7 @@ export const print = (object: any, RoomID?: string): void => {
     config = await (async (): Promise<Config> => {
         const propertiesPath: string = "./server-properties";
         await fs.mkdir(propertiesPath, { recursive: true });
+        await fs.mkdir("./logs", { recursive: true });
         const configPath: string = path.join(propertiesPath, "config.json");
 
         let Output: Config;
@@ -419,14 +427,10 @@ export const print = (object: any, RoomID?: string): void => {
             Output = structuredClone(defaultConfig);
         }
 
-        if(Output.PanelPassword === "") {
-            Output.PanelPassword = generatePassword(Output.AdminPasswordLength);
-        }
-
         await fs.writeFile(configPath, JSON.stringify(Output, null, 4), { encoding: "utf-8" });
         return Output;
     })(),
-    protocolRegistry: { [MessageName: string]: (UserID: string, ContentJSON: ContentJSONType) => void } = {},
+    protocolRegistry: { [MessageName: string]: (UserID: string, ContentJSON: ContentJSONType) => Promise<void> } = {},
     rooms: RoomsObj = {},
     members: MembersObj = {},
     adminLookUp: string[] = [],

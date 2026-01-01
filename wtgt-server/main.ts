@@ -1,19 +1,135 @@
 "use strict";
 
-import fs from "fs/promises";
-import path from "path";
+import child_process from "child_process";
+import util from "util";
+import readline from "readline";
 
 import validateMessage from "./helpers/validateMessage.js";
 import getCurrentTime from "./helpers/getCurrentTime.js";
-import generatePassword from "./helpers/generatePassword.js";
 
 import * as sendMessageTypes from "./types/client-to-server.js";
 import * as adminSendMessageTypes from "./types/admin-to-server.js";
 import * as Server from "./internal/server.js";
+import * as db from "./internal/dbManager.js";
+
+import { command } from "./internal/commandParser.js";
+
+const monitorableTerm: child_process.ChildProcessWithoutNullStreams = child_process.spawn("node", ["./helpers/echo.js"], { stdio: ["pipe", "pipe", "pipe"] });
+
+const sendInitMessage = (RoomID: string, UserID: string): void => {
+        const Room = Server.rooms[RoomID];    
+
+        Room.Members.push(UserID);
+        Server.members[UserID].In = RoomID;
+
+        const toSend: { [Props: string]: any } = {
+            CurrentMedia: Room.CurrentMedia,
+            IsPaused: Room.IsPaused,
+            Mods: Room.Mods,
+            Members: Object.fromEntries(Room.Members.map((MemberID: string) => [MemberID, { UserName: Server.members[MemberID].UserName, Avt: Server.members[MemberID].Avt }])),
+            Messages: Room.Messages,
+            RoomID: RoomID
+        };
+
+        Server.getSession(UserID).send(JSON.stringify({ type: "init", content: toSend }));
+
+        Server.broadcastToRoom(RoomID, { 
+            type: "join", 
+            content: {
+                UserID,
+                UserName: Server.members[UserID].UserName,
+                Avt: Server.members[UserID].Avt
+            } 
+        }, UserID);
+
+        Server.broadcastToAdmins({ 
+            type: "userJoin", 
+            content: {
+                UserID,
+                Target: RoomID
+            } 
+        });
+        Server.print(`${UserID} joined a room.`, RoomID);
+    },
+    renderConsole = (): void => {
+        console.clear();
+        console.log(Server.logs.join("\n"));
+        
+        const start: number = currentInput.search(/\S/);
+        let index: number = currentInput.indexOf(" ", start);
+
+        if(index === -1)
+            index = currentInput.length;
+
+        const toPrint: string = `${util.styleText(["yellowBright"], currentInput.substring(0, index))}${currentInput.substring(index)}`;
+
+        const prompt: string = `${consolePrompt}${toPrint}`;
+        process.stdout.write(prompt);
+        readline.cursorTo(process.stdout, consolePrompt.length + cursorPos)
+    }
+;
+
+interface onKeyPress {
+    sequence: string;
+    ctrl: boolean;
+    meta: boolean;
+    shift: boolean;
+    name?: string;
+    code?: string;
+}
+
+let consoleFlushingTimer: NodeJS.Timeout,
+    currentInput: string = "",
+    cursorPos: number = 0,
+    consolePrompt = "Console Command: "
+;
+
+Server.monitorableTerm(monitorableTerm);
+readline.emitKeypressEvents(process.stdin);
+process.stdin.setEncoding("utf-8");
+process.stdin.resume();
+
+if(process.stdin.isTTY) {
+    process.stdin.setRawMode(true);
+}
+
+process.stdin.on("keypress", async (str: string, key: onKeyPress): Promise<void> => {
+    if(!key)
+        return;
+
+    if(key.name === "return" || key.name === "enter") {
+        if(!currentInput.trim())
+            return;
+
+        try {
+            await command.execute(currentInput);
+        }
+        catch(err) {
+            Server.print(err instanceof Error ? err.message : err);
+        }
+        currentInput = "";
+        cursorPos = 0;
+    }
+    else if((key.name === "backspace" || str === "\x7f") && cursorPos > 0) {
+        currentInput = `${currentInput.slice(0, cursorPos - 1)}${currentInput.slice(cursorPos)}`;
+        cursorPos--;
+    }
+    else if(key.name === "left" && cursorPos > 0) 
+        cursorPos--;
+    else if(key.name === "right" && cursorPos < currentInput.length) 
+        cursorPos++;
+    else if(key.sequence && key.sequence.length === 1 && !key.ctrl && !key.meta && (key.name !== "backspace" || str !== "\x7f")) {
+        currentInput = `${currentInput.slice(0, cursorPos)}${key.sequence}${currentInput.slice(cursorPos)}`;
+        cursorPos++;
+    }
+    else return;
+
+    renderConsole();
+});
 
 // fake ass decorator
 Server.registerProtocol("host")
-((UserID: string, ContentJSON: sendMessageTypes.host): void => {
+(async (UserID: string, ContentJSON: sendMessageTypes.host): Promise<void> => {
     if(!validateMessage(ContentJSON, { type: "test", content: { MediaName: "test", RoomType: "test", IsPaused: true }})) 
         return Server.sendError(UserID, `Invalid message format for ${ContentJSON.type}.`);
 
@@ -67,7 +183,7 @@ Server.registerProtocol("host")
 });
 
 Server.registerProtocol("join")
-((UserID: string, ContentJSON: sendMessageTypes.join): void => {
+(async (UserID: string, ContentJSON: sendMessageTypes.join): Promise<void> => {
     if(!validateMessage(ContentJSON, { type: "test", content: { RoomID: "" } })) 
         return Server.sendError(UserID, `Invalid message format for ${ContentJSON.type}.`);
 
@@ -93,42 +209,11 @@ Server.registerProtocol("join")
         }));
         return;
     }
-
-    Room.Members.push(UserID);
-    Server.members[UserID].In = RoomID;
-
-    const toSend: { [Props: string]: any } = {
-        CurrentMedia: Room.CurrentMedia,
-        IsPaused: Room.IsPaused,
-        Mods: Room.Mods,
-        Members: Object.fromEntries(Room.Members.map((MemberID: string) => [MemberID, { UserName: Server.members[MemberID].UserName, Avt: Server.members[MemberID].Avt }])),
-        Messages: Room.Messages,
-        RoomID: RoomID
-    };
-
-    Server.getSession(UserID).send(JSON.stringify({ type: "init", content: toSend }));
-
-    Server.broadcastToRoom(RoomID, { 
-        type: "join", 
-        content: {
-            UserID,
-            UserName: Server.members[UserID].UserName,
-            Avt: Server.members[UserID].Avt
-        } 
-    }, UserID);
-
-    Server.broadcastToAdmins({ 
-        type: "userJoin", 
-        content: {
-            UserID,
-            Target: RoomID
-        } 
-    });
-    Server.print(`${UserID} joined a room.`, RoomID);
+    sendInitMessage(RoomID, UserID);
 });
 
 Server.registerProtocol("leave")
-((UserID: string, ContentJSON: sendMessageTypes.leave): void => {
+(async (UserID: string, ContentJSON: sendMessageTypes.leave): Promise<void> => {
     if(!validateMessage(ContentJSON, { type: "" }))
         return Server.sendError(UserID, `Invalid message format for ${ContentJSON.type}.`);
 
@@ -163,7 +248,7 @@ Server.registerProtocol("leave")
 });
 
 Server.registerProtocol("message")
-((UserID: string, ContentJSON: sendMessageTypes.message): void => {
+(async (UserID: string, ContentJSON: sendMessageTypes.message): Promise<void> => {
     if(!validateMessage(ContentJSON, { type: "test", content: { Text: "test" } })) 
         return Server.sendError(UserID, `Invalid message format for ${ContentJSON.type}.`);
 
@@ -193,7 +278,7 @@ Server.registerProtocol("message")
 });
 
 Server.registerProtocol("election")
-((UserID: string, ContentJSON: sendMessageTypes.election): void => {
+(async (UserID: string, ContentJSON: sendMessageTypes.election): Promise<void> => {
     if(!validateMessage(ContentJSON, { type: "test", content: { Target: "test" } }))
         return Server.sendError(UserID, `Invalid message format for ${ContentJSON.type}.`);
 
@@ -229,7 +314,7 @@ Server.registerProtocol("election")
 });
 
 Server.registerProtocol("demotion")
-((UserID: string, ContentJSON: sendMessageTypes.demotion): void => {
+(async (UserID: string, ContentJSON: sendMessageTypes.demotion): Promise<void> => {
     if(!validateMessage(ContentJSON, { type: "test", content: { Target: "test" } })) 
         return Server.sendError(UserID, `Invalid message format for ${ContentJSON.type}.`);
     
@@ -267,7 +352,7 @@ Server.registerProtocol("demotion")
 });
 
 Server.registerProtocol("pause")
-((UserID: string, ContentJSON: sendMessageTypes.pause): void => {
+(async (UserID: string, ContentJSON: sendMessageTypes.pause): Promise<void> => {
     if(!validateMessage(ContentJSON, { type: "test", content: { IsPaused: false } }))
         return Server.sendError(UserID, `Invalid message format for ${ContentJSON.type}.`);
 
@@ -285,7 +370,7 @@ Server.registerProtocol("pause")
 });
 
 Server.registerProtocol("sync")
-((UserID: string, ContentJSON: sendMessageTypes.sync): void => {
+(async (UserID: string, ContentJSON: sendMessageTypes.sync): Promise<void> => {
     if(!validateMessage(ContentJSON, { type: "test", content: { Timestamp: 1234 } }))
         return Server.sendError(UserID, `Invalid message format for ${ContentJSON.type}.`);
 
@@ -301,7 +386,7 @@ Server.registerProtocol("sync")
 });
 
 Server.registerProtocol("upload")
-((UserID: string, ContentJSON: sendMessageTypes.upload): void => {
+(async (UserID: string, ContentJSON: sendMessageTypes.upload): Promise<void> => {
     if(!validateMessage(ContentJSON, { type: "upload", content: { MediaName: "" } }))
         return Server.sendError(UserID, `Invalid message format for ${ContentJSON.type}.`);
 
@@ -317,7 +402,7 @@ Server.registerProtocol("upload")
 });
 
 Server.registerProtocol("query")
-((UserID: string, ContentJSON: sendMessageTypes.query): void => {
+(async (UserID: string, ContentJSON: sendMessageTypes.query): Promise<void> => {
     if(!validateMessage(ContentJSON, { type: "test" })) 
         return Server.sendError(UserID, `Invalid message format for ${ContentJSON.type}.`);
 
@@ -328,8 +413,8 @@ Server.registerProtocol("query")
 });
 
 Server.registerProtocol("approve")
-((UserID: string, ContentJSON: sendMessageTypes.approve): void => {
-    if(validateMessage(ContentJSON, { type: "test", content: { MemberID: "test" } })) 
+(async (UserID: string, ContentJSON: sendMessageTypes.approve): Promise<void> => {
+    if(!validateMessage(ContentJSON, { type: "test", content: { MemberID: "test" } })) 
         return Server.sendError(UserID, `Invalid message format for ${ContentJSON.type}.`);
 
     const RoomID: string = Server.members[UserID].In;
@@ -345,57 +430,32 @@ Server.registerProtocol("approve")
         return Server.sendError(UserID, `Member ${MemberID} doesn't exists.`);
 
     Room.Queue.splice(Room.Queue.indexOf(MemberID), 1);
-    Room.Members.push(UserID);
-    Server.members[UserID].In = RoomID;
-
-    const toSend = {
-        CurrentMedia: Room.CurrentMedia,
-        IsPaused: Room.IsPaused,
-        Mods: Room.Mods,
-        Members: Object.fromEntries(Room.Members.map((MemberID: string) => [MemberID, { UserName: Server.members[MemberID].UserName, Avt: Server.members[MemberID].Avt }])),
-        Messages: Room.Messages,
-        RoomID
-    };
-
-    Server.getSession(UserID).send(JSON.stringify({ type: "init", content: toSend }));
-
-    Server.broadcastToRoom(RoomID, { 
-        type: "join", 
-        content: {
-            UserID,
-            UserName: Server.members[UserID].UserName,
-            Avt: Server.members[UserID].Avt
-        } 
-    }, UserID);
-
-    Server.broadcastToAdmins({ 
-        type: "userJoin", 
-        content: {
-            UserID,
-            Target: RoomID
-        } 
-    });
-    Server.print(`${UserID} joined a room.`, RoomID);
+    sendInitMessage(RoomID, MemberID);
 });
 
 Server.registerProtocol("adminLogin")
-((AdminID: string, ContentJSON: adminSendMessageTypes.adminLogin): void => {
-    if(!validateMessage(ContentJSON, { type: "test", content: { Password: "string" } })) 
+(async (AdminID: string, ContentJSON: adminSendMessageTypes.adminLogin): Promise<void> => {
+    if(!validateMessage(ContentJSON, { type: "test", content: { UserName: "", Password: "string" } })) 
         return Server.sendError(AdminID, `Invalid message format for ${ContentJSON.type}.`);
 
-    if(Server.members[AdminID].IsAuthorized) 
+    const Admin = Server.members[AdminID];
+    if(Admin.IsAuthorized) 
         return Server.sendError(AdminID, "Already logged in as an admin.");
 
-    if(Server.members[AdminID].AdminLoginAttempts > Server.config.MaxAdminLoginAttempts) 
+    const AdminProfile = await db.query(ContentJSON.content.UserName);
+    if(AdminProfile.Approved)
+        return Server.sendError(AdminID, "Trying to log into an unapproved admin account, cannot continue.");
+
+    if(Admin.AdminLoginAttempts > Server.config.MaxAdminLoginAttempts) 
         return Server.sendError(AdminID, "Exceeded the login attempt count, cannot continue.");
 
-    if(ContentJSON.content.Password !== Server.config.PanelPassword) {
-        Server.members[AdminID].AdminLoginAttempts += 1;
+    if(ContentJSON.content.Password !== AdminProfile.Profile.Password) {
+        Admin.AdminLoginAttempts += 1;
         return Server.sendError(AdminID, "Incorrect admin password, please try again.");
     }
     
-    Server.members[AdminID].AdminLoginAttempts = 0;
-    Server.members[AdminID].IsAuthorized = true;
+    Admin.AdminLoginAttempts = 0;
+    Admin.IsAuthorized = true;
     Server.adminLookUp.push(AdminID);
 
     Server.getSession(AdminID).send(JSON.stringify({
@@ -410,7 +470,7 @@ Server.registerProtocol("adminLogin")
 });
 
 Server.registerProtocol("adminLogout")
-((AdminID: string, ContentJSON: adminSendMessageTypes.adminLogout): void => {
+(async (AdminID: string, ContentJSON: adminSendMessageTypes.adminLogout): Promise<void> => {
     if(!validateMessage(ContentJSON, { type: "adminLogout" })) 
         return Server.sendError(AdminID, `Invalid message format for ${ContentJSON.type}.`);
 
@@ -422,7 +482,7 @@ Server.registerProtocol("adminLogout")
 });
 
 Server.registerProtocol("shutdown")
-((AdminID: string, ContentJSON: adminSendMessageTypes.shutdown): void => {
+(async (AdminID: string, ContentJSON: adminSendMessageTypes.shutdown): Promise<void> => {
     if(!validateMessage(ContentJSON, { type: "shutdown" }))
         return Server.sendError(AdminID, `Invalid message format for ${ContentJSON.type}.`);
 
@@ -432,26 +492,83 @@ Server.registerProtocol("shutdown")
     Server.close();
 });
 
+new command("remove", {
+    Action: db.remove,
+    OnSuccess: (result: string): void => Server.print(`Admin ${result} successfully removed.`),
+    OnFailure: (err): void => Server.print(`Error: ${err.message}`),
+    Params: {
+        UserName: {
+            Type: "string",
+            Description: "Username of the target admin account."
+        }
+    },
+    Description: "Delete an admin's account."
+});
+
+new command("approve", {
+    Action: db.approve,
+    OnSuccess: (result: string): void => Server.print(`Admin ${result} successfully approved.`),
+    OnFailure: (err): void => Server.print(`Error: ${err.message}`),
+    Params: {
+        UserName: {
+            Type: "string",
+            Description: "Username of the target admin account."
+        }
+    },
+    Description: "Approve an admin's registration."
+});
+
+new command("stop", {
+    Action: Server.close,
+    Description: "Gracefully stop the server."
+});
+
+new command("uptime", {
+    Action: (): string => {
+        const divmod = (dividend: number, divisor: number): [number, number] => [Math.floor(dividend / divisor), Math.floor(dividend % divisor)];
+        const [Tminutes, seconds]: [number, number] = divmod(Math.floor(process.uptime()), 60);
+        const [hours, minutes]: [number, number] = divmod(Tminutes, 60);
+        return `${hours.toString().padStart(2, "0")}:${minutes.toString().padStart(2, "0")}:${seconds.toString().padStart(2, "0")}`;
+    },
+    OnSuccess: (result: string) => Server.print(`Server's been running for: ${result}.`),
+    Description: "Get the amount of time the server's been running."
+});
+
+new command("clear", {
+    Action: async (): Promise<void> => { 
+        await Server.writeLog();
+        console.clear();
+        if(Server.config.ServerTerminalFlushing) {
+            clearInterval(consoleFlushingTimer);
+            consoleFlushingTimer = setInterval(async (): Promise<void> => {
+                await Server.writeLog();
+                console.clear();
+            }, Server.hoursToMs(Math.floor(Server.config.FlushingIntervalHours)));
+        }
+    },
+    OnFailure: (err: any): void => Server.print(err),
+    Description: "Manually flush the console and reset the server console flushing timer."
+});
+
 process.on("SIGTERM", Server.close);
 process.on("SIGINT", Server.close);
 process.on("SIGHUP", Server.close);
-process.on("uncaughtException", Server.close);
-process.on("unhandledRejection", Server.close);
+
+process.on("uncaughtException", (err) => {
+    console.log(err);
+});
+process.on("unhandledRejection", (err) => {
+    console.log(err);
+});
 
 Server.server.listen(Server.config.PORT, () => {
+    console.clear();
     Server.print(`Hello World! Server's running at port ${Server.config.PORT}.`);
-    if(Server.config.RegeneratePassword) {
-        setInterval(async () => {
-            Server.config.PanelPassword = generatePassword(Server.config.AdminPasswordLength, Server.config.PanelPassword);
-            await fs.writeFile(path.join("./server-properties", "config.json"), JSON.stringify(Server.config, null, 4), { encoding: "utf-8" });
-            Server.print(`Password resetted. Current Admin panel password is: ${Server.config.PanelPassword}`);
-        }, Server.hoursToMs(Server.config.PasswordRegenerationIntervalHours));
-    }
+    renderConsole();
     if(Server.config.ServerTerminalFlushing) {
-        setInterval(async () => {
+        consoleFlushingTimer = setInterval(async () => {
             await Server.writeLog();
             console.clear();
-            Server.print(`Current Admin panel password is: ${Server.config.PanelPassword}`);
         }, Server.hoursToMs(Server.config.FlushingIntervalHours));
     }
 });
