@@ -1,11 +1,13 @@
 # Quick Reference: Updating Room.tsx to Use WebSocket API
 
 ## Before
+
 - Placeholder components
 - Hardcoded demo data
 - No server connection
 
 ## After
+
 - Real-time video playback control
 - Live chat messaging
 - Media uploading
@@ -17,14 +19,14 @@
 ## STEP 1: Import the API
 
 ```typescript
-import { useWebSocketContext, useWebSocketMessage } from '../api'
+import { useWebSocketContext, useWebSocketMessage } from "../api";
 import type {
   MessageReceivedContent,
   PlaybackStateChangedContent,
   JoinResponse,
   MemberJoinedContent,
   MemberLeftContent,
-} from '../api'
+} from "../api";
 ```
 
 ---
@@ -32,19 +34,21 @@ import type {
 ## STEP 2: Replace Initial State
 
 ### OLD (Remove):
+
 ```typescript
 const [messages, setMessages] = useState<Message[]>([...])
 const [messageInput, setMessageInput] = useState('')
 ```
 
 ### NEW:
+
 ```typescript
-const { client, isConnected, connect } = useWebSocketContext()
-const [messages, setMessages] = useState<ChatMessage[]>([])
-const [messageInput, setMessageInput] = useState('')
-const [members, setMembers] = useState<RoomMember[]>([])
-const [currentMedia, setCurrentMedia] = useState('')
-const [isPaused, setIsPaused] = useState(false)
+const { client, isConnected, connect } = useWebSocketContext();
+const [messages, setMessages] = useState<ChatMessage[]>([]);
+const [messageInput, setMessageInput] = useState("");
+const [members, setMembers] = useState<RoomMember[]>([]);
+const [currentMedia, setCurrentMedia] = useState("");
+const [isPaused, setIsPaused] = useState(false);
 ```
 
 ---
@@ -54,23 +58,23 @@ const [isPaused, setIsPaused] = useState(false)
 ```typescript
 useEffect(() => {
   if (!isConnected && client) {
-    const username = localStorage.getItem('username') || 'Anonymous'
-    const avatar = localStorage.getItem('avatar') || '😊'
-    connect(username, avatar)
+    const username = localStorage.getItem("username") || "Anonymous";
+    const avatar = localStorage.getItem("avatar") || "😊";
+    connect(username, avatar);
   }
-}, [isConnected, client, connect])
+}, [isConnected, client, connect]);
 ```
 
----
+//TODO: JUST UPDATE Room.tsx USING THIS GUIDE, MAN
 
 ## STEP 4: Join Room When Connected
 
 ```typescript
 useEffect(() => {
   if (isConnected && client) {
-    client.joinRoom(roomId)
+    client.joinRoom(roomId);
   }
-}, [isConnected, client, roomId])
+}, [isConnected, client, roomId]);
 ```
 
 ---
@@ -113,23 +117,23 @@ useWebSocketMessage<MemberLeftContent>('memberLeft', (content) => {
 ```typescript
 const handlePlayPause = () => {
   if (client) {
-    client.pausePlayback(roomId, !isPaused)
+    client.pausePlayback(roomId, !isPaused);
   }
-}
+};
 
 const handleUploadMedia = (mediaName: string) => {
   if (client) {
-    client.uploadMedia(roomId, mediaName)
+    client.uploadMedia(roomId, mediaName);
   }
-}
+};
 
 const handleSendMessage = (e: React.FormEvent<HTMLFormElement>) => {
-  e.preventDefault()
+  e.preventDefault();
   if (messageInput.trim() && client) {
-    client.sendMessage(roomId, messageInput)
-    setMessageInput('')
+    client.sendMessage(roomId, messageInput);
+    setMessageInput("");
   }
-}
+};
 ```
 
 ---
@@ -137,15 +141,18 @@ const handleSendMessage = (e: React.FormEvent<HTMLFormElement>) => {
 ## STEP 7: Update JSX Elements
 
 ### Video Player
+
 **OLD:** Hardcoded placeholder  
 **NEW:** Shows current media name
+
 ```typescript
 <p className="text-sm text-content-secondary">
-  {currentMedia || 'Waiting for media...'}
+  {currentMedia || "Waiting for media..."}
 </p>
 ```
 
 ### Controls
+
 ```typescript
 <button onClick={handlePlayPause} className="...">
   {isPaused ? '▶ Play' : '⏸ Pause'}
@@ -157,6 +164,7 @@ const handleSendMessage = (e: React.FormEvent<HTMLFormElement>) => {
 ```
 
 ### Room Info Stats
+
 ```typescript
 <p className="text-2xl font-bold">{members.length}</p>
 <p className="text-2xl font-bold">
@@ -165,22 +173,26 @@ const handleSendMessage = (e: React.FormEvent<HTMLFormElement>) => {
 ```
 
 ### Messages
+
 ```typescript
-{messages.length === 0 ? (
-  <p>No messages yet...</p>
-) : (
-  messages.map((msg) => (
-    <div key={msg.id}>
-      <span>{msg.sender.avatar}</span>
-      <span>{msg.sender.username}</span>
-      <span>{msg.timestamp.toLocaleTimeString()}</span>
-      <p>{msg.text}</p>
-    </div>
-  ))
-)}
+{
+  messages.length === 0 ? (
+    <p>No messages yet...</p>
+  ) : (
+    messages.map((msg) => (
+      <div key={msg.id}>
+        <span>{msg.sender.avatar}</span>
+        <span>{msg.sender.username}</span>
+        <span>{msg.timestamp.toLocaleTimeString()}</span>
+        <p>{msg.text}</p>
+      </div>
+    ))
+  );
+}
 ```
 
 ### Message Input
+
 ```typescript
 <input
   disabled={!isConnected}
@@ -200,21 +212,21 @@ const handleSendMessage = (e: React.FormEvent<HTMLFormElement>) => {
 
 ```typescript
 interface RoomMember {
-  id: string
-  username: string
-  avatar: string
-  role: 'member' | 'moderator' | 'host'
+  id: string;
+  username: string;
+  avatar: string;
+  role: "member" | "moderator" | "host";
 }
 
 interface ChatMessage {
-  id: string
+  id: string;
   sender: {
-    id: string
-    username: string
-    avatar: string
-  }
-  text: string
-  timestamp: Date
+    id: string;
+    username: string;
+    avatar: string;
+  };
+  text: string;
+  timestamp: Date;
 }
 ```
 
@@ -230,10 +242,11 @@ interface ChatMessage {
 ✅ Connection status handling  
 ✅ Full error handling  
 ✅ Type safety with TypeScript  
-✅ Responsive design with CSS variables  
+✅ Responsive design with CSS variables
 
 ---
 
 ## See Also
+
 - `INTEGRATION_EXAMPLE.tsx` - Complete working implementation
 - `README.md` - Full API documentation
