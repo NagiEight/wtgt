@@ -433,6 +433,19 @@ Server.registerProtocol("approve")
     sendInitMessage(RoomID, MemberID);
 });
 
+Server.registerProtocol("register")
+(async (AdminID: string, ContentJSON: adminSendMessageTypes.register): Promise<void> => {
+    if(!validateMessage(ContentJSON, { type: "", content: { UserName: "", Password: "" } }))
+        Server.sendError(AdminID, `Invalid message format for ${ContentJSON.type}.`);
+
+    try {
+        await db.add(ContentJSON.content.UserName, ContentJSON.content.Password);
+    }
+    catch(err) {
+        Server.sendError(AdminID, err.message);
+    }
+});
+
 Server.registerProtocol("adminLogin")
 (async (AdminID: string, ContentJSON: adminSendMessageTypes.adminLogin): Promise<void> => {
     if(!validateMessage(ContentJSON, { type: "test", content: { UserName: "", Password: "string" } })) 
@@ -443,7 +456,7 @@ Server.registerProtocol("adminLogin")
         return Server.sendError(AdminID, "Already logged in as an admin.");
 
     const AdminProfile = await db.query(ContentJSON.content.UserName);
-    if(AdminProfile.Approved)
+    if(!AdminProfile.Approved)
         return Server.sendError(AdminID, "Trying to log into an unapproved admin account, cannot continue.");
 
     if(Admin.AdminLoginAttempts > Server.config.MaxAdminLoginAttempts) 

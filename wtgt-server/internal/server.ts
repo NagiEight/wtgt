@@ -80,6 +80,7 @@ type ContentJSONType =
     | adminSendMessageTypes.adminLogin 
     | adminSendMessageTypes.adminLogout 
     | adminSendMessageTypes.shutdown
+    | adminSendMessageTypes.register
 ;
 
 type SendMessageTypes = 
