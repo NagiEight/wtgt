@@ -12,24 +12,26 @@ import getCurrentTime from "../helpers/getCurrentTime.js";
 
 import * as db from "./dbManager.js";
 
-interface RoomsObj {
-    [RoomID: string]: {
-        CurrentMedia: string;
-        Host: string;
-        Limit: number;
-        Type: "private" | "public";
-        IsPaused: boolean;
-        Mods: string[];
-        Members: string[];
-        Queue: string[];
-        Messages: {
-            [MessageID: string]: {
-                Sender: string;
-                Text: string;
-                Timestamp: string;
-            };
+export interface Room {
+    CurrentMedia: string;
+    Host: string;
+    Limit: number;
+    Type: "private" | "public";
+    IsPaused: boolean;
+    Mods: string[];
+    Members: string[];
+    Queue: string[];
+    Messages: {
+        [MessageID: string]: {
+            Sender: string;
+            Text: string;
+            Timestamp: string;
         };
     };
+};
+
+interface RoomsObj {
+    [RoomID: string]: Room;
 }
 
 interface MembersObj {

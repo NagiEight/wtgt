@@ -120,7 +120,9 @@ export interface newMember {
 export interface signal {
     type: "signal";
     content: {
-        ICECandidate: any;
+        ICECandidate: string;
+        SDPMID: string;
+        SDPMLineIndex: number;
     }
 }
 

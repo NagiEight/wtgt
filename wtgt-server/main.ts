@@ -4,6 +4,8 @@ import child_process from "child_process";
 import util from "util";
 import readline from "readline";
 
+import { ChildProcessWithoutNullStreams } from "child_process";
+
 import validateMessage from "./helpers/validateMessage.js";
 import getCurrentTime from "./helpers/getCurrentTime.js";
 
@@ -13,11 +15,12 @@ import * as Server from "./internal/server.js";
 import * as db from "./internal/dbManager.js";
 
 import { command } from "./internal/commandParser.js";
+import { Room } from "./internal/server.js";
 
-const monitorableTerm: child_process.ChildProcessWithoutNullStreams = child_process.spawn("node", ["./helpers/echo.js"], { stdio: ["pipe", "pipe", "pipe"] });
+const monitorableTerm: ChildProcessWithoutNullStreams = child_process.spawn("node", ["./helpers/echo.js"], { stdio: ["pipe", "pipe", "pipe"] });
 
 const sendInitMessage = (RoomID: string, UserID: string): void => {
-        const Room = Server.rooms[RoomID];    
+        const Room: Room = Server.rooms[RoomID];    
 
         Room.Members.push(UserID);
         Server.members[UserID].In = RoomID;
@@ -133,8 +136,7 @@ Server.registerProtocol("host")
     if(!validateMessage(ContentJSON, { type: "test", content: { Limit: 1, MediaName: "test", RoomType: "test", IsPaused: true }})) 
         return Server.sendError(UserID, `Invalid message format for ${ContentJSON.type}.`);
 
-    const isInRoom: boolean = Server.members[UserID].In !== "";
-    if(isInRoom) 
+    if(Server.members[UserID].In) 
         return Server.sendError(UserID, `Member ${UserID} is already belong to a room.`);
 
     const allowedRoomTypes: string[] = [
@@ -146,9 +148,16 @@ Server.registerProtocol("host")
 
     if(!allowedRoomTypes.includes(RoomType))
         return Server.sendError(UserID, `Unknown room type: ${RoomType}.`);
+    
+    const RoomLimit: number = ContentJSON.content.Limit;
+    if(RoomLimit < 1) 
+        return Server.sendError(UserID, "Cannot create a room with less than 1 member");
+    
+    if(RoomLimit === 1)
+        return Server.sendError(UserID, "Just watch it on VLC at this point.");
 
     if(ContentJSON.content.Limit > Server.config.RoomLimit)
-        return Server.sendError(UserID, `Exceeded the room member limit.`)
+        return Server.sendError(UserID, "Exceeded the room member limit.");
 
     const RoomID: string = Server.generateUniqueUUID((UUID: string) => Boolean(Server.rooms[UUID])),
         MediaName: string = ContentJSON.content.MediaName,
@@ -160,7 +169,7 @@ Server.registerProtocol("host")
         CurrentMedia: MediaName,
         IsPaused,
         Host: UserID,
-        Limit: ContentJSON.content.Limit,
+        Limit: RoomLimit,
         Type: RoomType as "private" | "public",
         Mods: [],
         Queue: [],
@@ -191,17 +200,16 @@ Server.registerProtocol("join")
     if(!validateMessage(ContentJSON, { type: "test", content: { RoomID: "" } })) 
         return Server.sendError(UserID, `Invalid message format for ${ContentJSON.type}.`);
 
+    if(Server.members[UserID].In) 
+        return Server.sendError(UserID, `Member ${UserID} is already belong to a room.`);
+    
     const RoomID: string = ContentJSON.content.RoomID;
-    const Room = Server.rooms[RoomID];
+    const Room: Room = Server.rooms[RoomID];
     if(!Room)
         return Server.sendError(UserID, `Unknown room ${RoomID}.`);
 
-    if(Room.Members.length === Room.Limit)
-        return Server.sendError(UserID, "Maximum room member reached.");
-
-    const isInRoom: boolean = Server.members[UserID].In !== "";
-    if(isInRoom) 
-        return Server.sendError(UserID, `Member ${UserID} is already belong to a room.`);
+    if(Room.Members.length + Room.Queue.length === Room.Limit)
+        return Server.sendError(UserID, "Maximum room member reached.");    
 
     if(Room.Type === "private") {
         const MemberProfile = Server.members[UserID];
@@ -228,10 +236,12 @@ Server.registerProtocol("leave")
     if(!RoomID) 
         return Server.sendError(UserID, `Member ${UserID} does not belong to a room.`);
 
-    if(UserID === Server.rooms[RoomID].Host) {
+    const Room: Room = Server.rooms[RoomID];
+
+    if(UserID === Room.Host) {
         Server.broadcastToRoom(RoomID, { type: "end", content: undefined });
 
-        for(const MemberID of Server.rooms[RoomID].Members)
+        for(const MemberID of Room.Members)
             Server.members[MemberID].In = "";
 
         delete Server.rooms[RoomID];
@@ -240,7 +250,7 @@ Server.registerProtocol("leave")
         return;
     }
     
-    const roomMember: string[] = Server.rooms[RoomID].Members;
+    const roomMember: string[] = Room.Members;
     roomMember.splice(roomMember.indexOf(UserID), 1);
     Server.broadcastToRoom(RoomID, { type: "leave", content: { MemberID: UserID } });
     Server.members[UserID].In = "";
@@ -269,7 +279,8 @@ Server.registerProtocol("message")
             Sender: UserID,
             Text,
             Timestamp: getCurrentTime()
-        };
+        }
+    ;
 
     Server.rooms[RoomID].Messages[MessageID] = MessageObject;
 
@@ -294,13 +305,15 @@ Server.registerProtocol("election")
         return Server.sendError(UserID, `Member ${UserID} does not belong to a room.`);
     
     const Target: string = ContentJSON.content.Target,
-    isMemberBelongToRoom = Server.rooms[RoomID].Members.includes(Target),
-    isMemberAMod = Server.rooms[RoomID].Mods.includes(Target),
-    doesMemberHasPermission = Server.rooms[RoomID].Host == UserID,
-    isEligibleForElection = isMemberBelongToRoom && !isMemberAMod && doesMemberHasPermission;
+        Room: Room = Server.rooms[RoomID],
+        isMemberBelongToRoom = Room.Members.includes(Target),
+        isMemberAMod = Room.Mods.includes(Target),
+        doesMemberHasPermission = Room.Host == UserID,
+        isEligibleForElection = isMemberBelongToRoom && !isMemberAMod && doesMemberHasPermission
+    ;
 
     if(isEligibleForElection) {
-        Server.rooms[RoomID].Mods.push(Target);
+        Room.Mods.push(Target);
 
         Server.broadcastToRoom(RoomID, ContentJSON);
 
@@ -331,13 +344,15 @@ Server.registerProtocol("demotion")
         return Server.sendError(UserID, `Member ${UserID} does not belong to a room.`);
         
     const Target: string = ContentJSON.content.Target,
-    isMemberBelongToRoom: boolean = Server.rooms[RoomID].Members.includes(Target),
-    isMemberAMod: boolean = Server.rooms[RoomID].Mods.includes(Target),
-    doesMemberHasPermission: boolean = Server.rooms[RoomID].Host == UserID,
-    isEligibleForDemotion: boolean = isMemberBelongToRoom && isMemberAMod && doesMemberHasPermission;
+        Room: Room = Server.rooms[RoomID],
+        isMemberBelongToRoom: boolean = Room.Members.includes(Target),
+        isMemberAMod: boolean = Room.Mods.includes(Target),
+        doesMemberHasPermission: boolean = Room.Host == UserID,
+        isEligibleForDemotion: boolean = isMemberBelongToRoom && isMemberAMod && doesMemberHasPermission
+    ;
 
     if(isEligibleForDemotion) {
-        Server.rooms[RoomID].Mods.splice(Server.rooms[RoomID].Mods.indexOf(Target), 1);
+        Room.Mods.splice(Room.Mods.indexOf(Target), 1);
 
         Server.broadcastToRoom(RoomID, { type: "demotion", content: { Target } });
 
@@ -367,8 +382,8 @@ Server.registerProtocol("pause")
     if(!RoomID)
         return Server.sendError(UserID, "Not currently in a room.");
     
-    const Room = Server.rooms[RoomID];
-    if(UserID !== Server.rooms[RoomID].Host && Server.rooms[RoomID].Type === "public") 
+    const Room: Room = Server.rooms[RoomID];
+    if(UserID !== Room.Host && Room.Type === "public") 
         return Server.sendError(UserID, "Insufficient permission.");
 
     Room.IsPaused = ContentJSON.content.IsPaused;
@@ -385,7 +400,8 @@ Server.registerProtocol("sync")
     if(!RoomID)
         return Server.sendError(UserID, `Member ${UserID} does not belong to a room.`);
 
-    if(UserID !== Server.rooms[RoomID].Host && Server.rooms[RoomID].Type === "public") 
+    const Room: Room = Server.rooms[RoomID];
+    if(UserID !== Room.Host && Room.Type === "public") 
         return Server.sendError(UserID, "Insufficient permission.");
 
     Server.broadcastToRoom(RoomID, ContentJSON);
@@ -401,10 +417,11 @@ Server.registerProtocol("upload")
     if(!RoomID)
         return Server.sendError(UserID, `Member ${UserID} does not belong to a room.`);
 
-    if(UserID !== Server.rooms[RoomID].Host) 
+    const Room: Room = Server.rooms[RoomID];
+    if(UserID !== Room.Host) 
         return Server.sendError(UserID, "Insufficient permission.");
 
-    Server.rooms[RoomID].CurrentMedia = ContentJSON.content.MediaName;
+    Room.CurrentMedia = ContentJSON.content.MediaName;
     Server.broadcastToRoom(RoomID, ContentJSON);
 });
 
@@ -428,7 +445,7 @@ Server.registerProtocol("approve")
     if(!RoomID)
         return Server.sendError(UserID, `Member ${UserID} does not belong to a room.`);
 
-    const Room = Server.rooms[RoomID];
+    const Room: Room = Server.rooms[RoomID];
     if(Room.Members.length === Room.Limit)
         return Server.sendError(UserID, "Maximum room member reached.");
 
@@ -445,7 +462,7 @@ Server.registerProtocol("approve")
 
 Server.registerProtocol("signal")
 (async (UserID: string, ContentJSON: sendMessageTypes.signal) => {
-    if(!validateMessage(ContentJSON, { type: "", content: { ICECandidate: 1 } }))
+    if(!validateMessage(ContentJSON, { type: "", content: { ICECandidate: "", SDPMID: "", SDPMLineIndex: "" } }))
         return Server.sendError(UserID, `Invalid message format for ${ContentJSON.type}.`);
 
     const RoomID: string = Server.members[UserID].In;
