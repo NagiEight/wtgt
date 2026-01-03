@@ -4,6 +4,7 @@ export interface host {
         MediaName: string;
         RoomType: "private" | "public";
         IsPaused: boolean;
+        Limit: number;
     };
 }
 
@@ -62,6 +63,13 @@ export interface upload {
 
 export interface query {
     type: "query";
+}
+
+export interface signal {
+    type: "signal";
+    content: {
+        ICECandidate: any;
+    }
 }
 
 export interface approve {

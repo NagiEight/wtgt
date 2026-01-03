@@ -6,20 +6,17 @@ import util from "util";
 import * as ws from "ws";
 
 import { existsSync } from "fs";
+import { ChildProcessWithoutNullStreams } from "child_process";
 
 import getCurrentTime from "../helpers/getCurrentTime.js";
 
-import * as sendMessageTypes from "../types/client-to-server.js";
-import * as adminSendMessageTypes from "../types/admin-to-server.js";
-import * as receiveMessageTypes from "../types/server-to-client.js";
-import * as adminReceiveMessageTypes from "../types/server-to-admin.js";
 import * as db from "./dbManager.js";
-import { ChildProcessWithoutNullStreams } from "child_process";
 
 interface RoomsObj {
     [RoomID: string]: {
         CurrentMedia: string;
         Host: string;
+        Limit: number;
         Type: "private" | "public";
         IsPaused: boolean;
         Mods: string[];
@@ -50,10 +47,11 @@ interface Config {
     AdminPasswordLength: number;
     MaxAdminLoginAttempts: number;
     PORT: number;
-    ServerTerminalFlushing: boolean;
-    FlushingIntervalHours: number;
     BucketCapacity: number;
     BucketRefillIntervalHours: number;
+    RoomLimit: number;
+    FlushingIntervalHours: number;
+    ServerTerminalFlushing: boolean;
 }
 
 interface Bucket {
@@ -63,54 +61,14 @@ interface Bucket {
     }
 }
 
+interface Message {
+    type: string;
+    content?: {
+        [Props: string]: string | boolean | number | string[] | boolean[] | number[]
+    }
+}
+
 type Router = (urlParts: string[], url: URL) => Promise<string | null>;
-
-type ContentJSONType = 
-    | sendMessageTypes.host 
-    | sendMessageTypes.join 
-    | sendMessageTypes.leave 
-    | sendMessageTypes.message 
-    | sendMessageTypes.election 
-    | sendMessageTypes.demotion 
-    | sendMessageTypes.pause 
-    | sendMessageTypes.sync 
-    | sendMessageTypes.upload 
-    | sendMessageTypes.query 
-    | sendMessageTypes.approve
-    | adminSendMessageTypes.adminLogin 
-    | adminSendMessageTypes.adminLogout 
-    | adminSendMessageTypes.shutdown
-    | adminSendMessageTypes.register
-;
-
-type SendMessageTypes = 
-    | receiveMessageTypes.info 
-    | receiveMessageTypes.init 
-    | receiveMessageTypes.join 
-    | receiveMessageTypes.message 
-    | receiveMessageTypes.election 
-    | receiveMessageTypes.demotion 
-    | receiveMessageTypes.leave 
-    | receiveMessageTypes.end 
-    | receiveMessageTypes.pause 
-    | receiveMessageTypes.sync 
-    | receiveMessageTypes.upload
-    | receiveMessageTypes.error
-    | receiveMessageTypes.disconnect
-    | receiveMessageTypes.newMember
-;
-
-type AdminSendMessageTypes = 
-    | adminReceiveMessageTypes.adminInit 
-    | adminReceiveMessageTypes.log 
-    | adminReceiveMessageTypes.userHost 
-    | adminReceiveMessageTypes.userJoin 
-    | adminReceiveMessageTypes.userElection 
-    | adminReceiveMessageTypes.userDemotion 
-    | adminReceiveMessageTypes.memberLeave 
-    | adminReceiveMessageTypes.roomEnd 
-    | adminReceiveMessageTypes.connection
-;
 
 const getIPs = (req: http.IncomingMessage): string[] => [...(
             Array.isArray(req.headers["x-forwarded-for"]) ? 
@@ -245,7 +203,7 @@ const getIPs = (req: http.IncomingMessage): string[] => [...(
                 }
             }
 
-            let ContentJSON: ContentJSONType;
+            let ContentJSON: Message;
             try {
                 ContentJSON = JSON.parse(data.toString());
             }
@@ -306,18 +264,17 @@ const getIPs = (req: http.IncomingMessage): string[] => [...(
         AdminPasswordLength: 16,
         MaxAdminLoginAttempts: 5,
         PORT: 3000,
-        ServerTerminalFlushing: true,
-        FlushingIntervalHours: 12,
         BucketCapacity: 2500,
-        BucketRefillIntervalHours: 1
+        BucketRefillIntervalHours: 1,
+        RoomLimit: 20,
+        FlushingIntervalHours: 12,
+        ServerTerminalFlushing: true
     }
 ;
 
 let monitorableTerm_: ChildProcessWithoutNullStreams;
 
-export const monitorableTerm = (term: ChildProcessWithoutNullStreams): void => {
-        monitorableTerm_ = term;
-    },
+export const monitorableTerm = (term: ChildProcessWithoutNullStreams): void => (monitorableTerm_ = term) as unknown as void,
     print = (object: any, RoomID?: string): void => {
         let toPrint = object;
         if(typeof toPrint !== "string")
@@ -327,7 +284,7 @@ export const monitorableTerm = (term: ChildProcessWithoutNullStreams): void => {
     },
     hoursToMs = (time: number): number => time * 3600000,
     allowRequest = (IP: string): boolean => {
-        const refillRate = config.BucketCapacity / hoursToMs(config.BucketRefillIntervalHours);
+        const refillRate: number = config.BucketCapacity / hoursToMs(config.BucketRefillIntervalHours);
 
         const now: number = Date.now();
         let bucket = buckets[IP];
@@ -346,7 +303,7 @@ export const monitorableTerm = (term: ChildProcessWithoutNullStreams): void => {
         bucket.Tokens -= 1;
         return true;
     }, 
-    registerProtocol = <T extends ContentJSONType>(messageName: string) => (target: (UserID: string, ContentJSON: T) => Promise<void>): void => 
+    registerProtocol = <T extends Message>(messageName: string) => (target: (UserID: string, ContentJSON: T) => Promise<void>): void => 
         (protocolRegistry[messageName] = target) as unknown as void,
     /**
      * Stop the server and write log.
@@ -365,7 +322,7 @@ export const monitorableTerm = (term: ChildProcessWithoutNullStreams): void => {
     /**
      * Broadcast ContentJSON to room of RoomID.
      */
-    broadcastToRoom = (RoomID: string, ContentJSON: SendMessageTypes, ...except: string[]): void => {
+    broadcastToRoom = (RoomID: string, ContentJSON: Message, ...except: string[]): void => {
         if(!rooms[RoomID])
             return;
 
@@ -398,7 +355,7 @@ export const monitorableTerm = (term: ChildProcessWithoutNullStreams): void => {
     /**
      * Broacast ContentJSON to all active admin clients.
      */
-    broadcastToAdmins = (ContentJSON: AdminSendMessageTypes): void => adminLookUp.forEach((AdminID: string): void => members[AdminID].Socket.send(JSON.stringify(ContentJSON))),     
+    broadcastToAdmins = (ContentJSON: Message): void => adminLookUp.forEach((AdminID: string): void => members[AdminID].Socket.send(JSON.stringify(ContentJSON))),     
     /**
      * Generate a unique UUID base on the prerequisite function, regenerate if prerequisite returns true.
      */
@@ -431,7 +388,7 @@ export const monitorableTerm = (term: ChildProcessWithoutNullStreams): void => {
         await fs.writeFile(configPath, JSON.stringify(Output, null, 4), { encoding: "utf-8" });
         return Output;
     })(),
-    protocolRegistry: { [MessageName: string]: (UserID: string, ContentJSON: ContentJSONType) => Promise<void> } = {},
+    protocolRegistry: { [MessageName: string]: (UserID: string, ContentJSON: Message) => Promise<void> } = {},
     rooms: RoomsObj = {},
     members: MembersObj = {},
     adminLookUp: string[] = [],

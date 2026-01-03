@@ -130,7 +130,7 @@ process.stdin.on("keypress", async (str: string, key: onKeyPress): Promise<void>
 // fake ass decorator
 Server.registerProtocol("host")
 (async (UserID: string, ContentJSON: sendMessageTypes.host): Promise<void> => {
-    if(!validateMessage(ContentJSON, { type: "test", content: { MediaName: "test", RoomType: "test", IsPaused: true }})) 
+    if(!validateMessage(ContentJSON, { type: "test", content: { Limit: 1, MediaName: "test", RoomType: "test", IsPaused: true }})) 
         return Server.sendError(UserID, `Invalid message format for ${ContentJSON.type}.`);
 
     const isInRoom: boolean = Server.members[UserID].In !== "";
@@ -147,6 +147,9 @@ Server.registerProtocol("host")
     if(!allowedRoomTypes.includes(RoomType))
         return Server.sendError(UserID, `Unknown room type: ${RoomType}.`);
 
+    if(ContentJSON.content.Limit > Server.config.RoomLimit)
+        return Server.sendError(UserID, `Exceeded the room member limit.`)
+
     const RoomID: string = Server.generateUniqueUUID((UUID: string) => Boolean(Server.rooms[UUID])),
         MediaName: string = ContentJSON.content.MediaName,
         IsPaused: boolean = ContentJSON.content.IsPaused
@@ -157,6 +160,7 @@ Server.registerProtocol("host")
         CurrentMedia: MediaName,
         IsPaused,
         Host: UserID,
+        Limit: ContentJSON.content.Limit,
         Type: RoomType as "private" | "public",
         Mods: [],
         Queue: [],
@@ -191,6 +195,9 @@ Server.registerProtocol("join")
     const Room = Server.rooms[RoomID];
     if(!Room)
         return Server.sendError(UserID, `Unknown room ${RoomID}.`);
+
+    if(Room.Members.length === Room.Limit)
+        return Server.sendError(UserID, "Maximum room member reached.");
 
     const isInRoom: boolean = Server.members[UserID].In !== "";
     if(isInRoom) 
@@ -422,7 +429,10 @@ Server.registerProtocol("approve")
         return Server.sendError(UserID, `Member ${UserID} does not belong to a room.`);
 
     const Room = Server.rooms[RoomID];
-    if(UserID !== Room.Host || !Room.Mods.includes(UserID)) 
+    if(Room.Members.length === Room.Limit)
+        return Server.sendError(UserID, "Maximum room member reached.");
+
+    if(UserID !== Room.Host && !Room.Mods.includes(UserID)) 
         return Server.sendError(UserID, "Insufficient permission.");
 
     const MemberID: string = ContentJSON.content.MemberID;
@@ -433,13 +443,30 @@ Server.registerProtocol("approve")
     sendInitMessage(RoomID, MemberID);
 });
 
+Server.registerProtocol("signal")
+(async (UserID: string, ContentJSON: sendMessageTypes.signal) => {
+    if(!validateMessage(ContentJSON, { type: "", content: { ICECandidate: 1 } }))
+        return Server.sendError(UserID, `Invalid message format for ${ContentJSON.type}.`);
+
+    const RoomID: string = Server.members[UserID].In;
+    if(!RoomID)
+        return Server.sendError(UserID, `Member ${UserID} does not belong to a room.`);
+
+    Server.broadcastToRoom(RoomID, ContentJSON);
+});
+
 Server.registerProtocol("register")
 (async (AdminID: string, ContentJSON: adminSendMessageTypes.register): Promise<void> => {
     if(!validateMessage(ContentJSON, { type: "", content: { UserName: "", Password: "" } }))
         Server.sendError(AdminID, `Invalid message format for ${ContentJSON.type}.`);
 
+    const existence = db.exists(ContentJSON.content.UserName);
+    const UserName: string = ContentJSON.content.UserName;
+    if(existence.Exists)
+        return Server.sendError(AdminID, `Username ${UserName} already exists, choose another.`);
+
     try {
-        await db.add(ContentJSON.content.UserName, ContentJSON.content.Password);
+        await db.add(UserName, ContentJSON.content.Password);
     }
     catch(err) {
         Server.sendError(AdminID, err.message);
@@ -455,7 +482,12 @@ Server.registerProtocol("adminLogin")
     if(Admin.IsAuthorized) 
         return Server.sendError(AdminID, "Already logged in as an admin.");
 
-    const AdminProfile = await db.query(ContentJSON.content.UserName);
+    const existence = db.exists(ContentJSON.content.UserName);
+    const UserName: string = ContentJSON.content.UserName;
+    if(existence.Exists)
+        return Server.sendError(AdminID, `Username ${UserName} doesn't exist, try again.`);
+
+    const AdminProfile = await db.query(UserName);
     if(!AdminProfile.Approved)
         return Server.sendError(AdminID, "Trying to log into an unapproved admin account, cannot continue.");
 
@@ -563,25 +595,22 @@ new command("clear", {
     Description: "Manually flush the console and reset the server console flushing timer."
 });
 
-process.on("SIGTERM", Server.close);
-process.on("SIGINT", Server.close);
-process.on("SIGHUP", Server.close);
-
 process.on("uncaughtException", (err) => {
-    console.log(err);
+    Server.print(err);
+    Server.close();
 });
 process.on("unhandledRejection", (err) => {
-    console.log(err);
+    Server.print(err);
+    Server.close();
 });
 
 Server.server.listen(Server.config.PORT, () => {
-    console.clear();
-    Server.print(`Hello World! Server's running at port ${Server.config.PORT}.`);
     renderConsole();
+    Server.print(`Hello World! Server's running at port ${Server.config.PORT}.`);
     if(Server.config.ServerTerminalFlushing) {
         consoleFlushingTimer = setInterval(async () => {
             await Server.writeLog();
-            console.clear();
+            renderConsole();
         }, Server.hoursToMs(Server.config.FlushingIntervalHours));
     }
 });
