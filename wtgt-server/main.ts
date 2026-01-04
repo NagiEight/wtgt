@@ -222,6 +222,7 @@ Server.registerProtocol("join")
                 Avt: MemberProfile.Avt
             }
         }));
+        Server.print(`${UserID} get puts in queue for room ${RoomID}.`);
         return;
     }
     sendInitMessage(RoomID, UserID);
@@ -477,8 +478,8 @@ Server.registerProtocol("register")
     if(!validateMessage(ContentJSON, { type: "", content: { UserName: "", Password: "" } }))
         Server.sendError(AdminID, `Invalid message format for ${ContentJSON.type}.`);
 
-    const existence = db.exists(ContentJSON.content.UserName);
     const UserName: string = ContentJSON.content.UserName;
+    const existence = db.exists(UserName);
     if(existence.Exists)
         return Server.sendError(AdminID, `Username ${UserName} already exists, choose another.`);
 
@@ -499,8 +500,8 @@ Server.registerProtocol("adminLogin")
     if(Admin.IsAuthorized) 
         return Server.sendError(AdminID, "Already logged in as an admin.");
 
-    const existence = db.exists(ContentJSON.content.UserName);
     const UserName: string = ContentJSON.content.UserName;
+    const existence = db.exists(UserName);
     if(existence.Exists)
         return Server.sendError(AdminID, `Username ${UserName} doesn't exist, try again.`);
 
