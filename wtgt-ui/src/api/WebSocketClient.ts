@@ -421,7 +421,7 @@ export class WebSocketClient {
    */
   public uploadMedia(mediaName: string): void {
     this.sendRequest<UploadContent>("upload", {
-      mediaName,
+      MediaName: mediaName,
     });
 
     // Handle upload progress

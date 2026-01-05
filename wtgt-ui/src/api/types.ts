@@ -147,7 +147,7 @@ export interface MessageReceivedContent {
 // =============================================
 
 export interface UploadContent {
-  mediaName: string;
+  MediaName: string;
 }
 
 export interface UploadResponse {
