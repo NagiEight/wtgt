@@ -75,7 +75,7 @@ export interface signal {
 }
 
 export interface approve {
-    type: "approve",
+    type: "approve";
     content: {
         MemberID: string;
     };

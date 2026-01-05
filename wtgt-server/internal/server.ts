@@ -340,6 +340,8 @@ export const monitorableTerm = (term: ChildProcessWithoutNullStreams): void => (
      * Write server's log to a file and empty the log array.
      */
     writeLog = async (): Promise<void> => { 
+        if(logs.length === 0)
+            return;
         await fs.writeFile(path.join("logs", `${generateUniqueUUID((UUID: string): boolean => existsSync(path.join("logs", `${UUID}.log`)))}.log`), logs.join("\n"), { encoding: "utf-8" });
         logs.length = 0;
     },
