@@ -117,15 +117,6 @@ export interface newMember {
     };
 }
 
-export interface signal {
-    type: "signal";
-    content: {
-        ICECandidate: string;
-        SDPMID: string;
-        SDPMLineIndex: number;
-    }
-}
-
 export interface queryResult {
     type: "queryResult";
     content: {

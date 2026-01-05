@@ -28,7 +28,7 @@ export interface Room {
             Timestamp: string;
         };
     };
-};
+}
 
 interface RoomsObj {
     [RoomID: string]: Room;
@@ -60,7 +60,7 @@ interface Bucket {
     [IP: string]: {
         Tokens: number;
         LastRefill: number;
-    }
+    };
 }
 
 interface Message {
@@ -193,7 +193,8 @@ const getIPs = (req: http.IncomingMessage): string[] => [...(
             delete members[UserID];
         });
 
-        client.on("message", async (data: ws.RawData): Promise<void> => {
+        client.on("message", async (data: ws.RawData, isBinary: boolean): Promise<void> => {
+            /*
             if(!members[UserID].IsAuthorized) {
                 const addresses: string[] = getIPs(req);
 
@@ -203,6 +204,17 @@ const getIPs = (req: http.IncomingMessage): string[] => [...(
                         return;
                     }
                 }
+            }/** */
+
+            if(isBinary) {
+                const RoomID: string = members[UserID].In;
+                const Room: Room = rooms[RoomID];
+                if(!Room) {
+                    sendError(UserID, "You do not belong to a room.");
+                }
+
+                broadcastToRoomBinaries(RoomID, data, UserID);
+                return;
             }
 
             let ContentJSON: Message;
@@ -336,6 +348,18 @@ export const monitorableTerm = (term: ChildProcessWithoutNullStreams): void => (
             }
         }
     },
+    broadcastToRoomBinaries = (RoomID: string, Buffer: ws.RawData, ...except: string[]): void => {
+        if(!rooms[RoomID])
+            return;
+
+        for(const UserID of rooms[RoomID].Members) {
+            const member: MembersObj[""] = members[UserID],
+            session: ws.WebSocket = getSession(UserID);
+            if(member && session && session.readyState === ws.WebSocket.OPEN && !except.includes(UserID)) {
+                session.send(Buffer, { binary: true });
+            }
+        }
+    },
     /**
      * Write server's log to a file and empty the log array.
      */
@@ -372,7 +396,7 @@ export const monitorableTerm = (term: ChildProcessWithoutNullStreams): void => (
 
         return UUID;
     },
-    config = await (async (): Promise<Config> => {
+    config: Config = await (async (): Promise<Config> => {
         const propertiesPath: string = "./server-properties";
         await fs.mkdir(propertiesPath, { recursive: true });
         await fs.mkdir("./logs", { recursive: true });

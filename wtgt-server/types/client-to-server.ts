@@ -65,15 +65,6 @@ export interface query {
     type: "query";
 }
 
-export interface signal {
-    type: "signal";
-    content: {
-        ICECandidate: string;
-        SDPMID: string;
-        SDPMLineIndex: number;
-    }
-}
-
 export interface approve {
     type: "approve";
     content: {

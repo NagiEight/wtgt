@@ -8,10 +8,8 @@ interface AdminProfile {
     Password: string;
 }
 
-await (async (): Promise<void> => {
-    await fs.mkdir(path.join("./admins", "queue"), { recursive: true });
-    await fs.mkdir(path.join("./admins", "approved"), { recursive: true });
-})();
+await fs.mkdir(path.join("./admins", "queue"), { recursive: true });
+await fs.mkdir(path.join("./admins", "approved"), { recursive: true });
 
 export const 
     /**

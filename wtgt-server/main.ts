@@ -235,7 +235,7 @@ Server.registerProtocol("leave")
 
     const RoomID: string = Server.members[UserID].In;
     if(!RoomID) 
-        return Server.sendError(UserID, `Member ${UserID} does not belong to a room.`);
+        return Server.sendError(UserID, `You do not belong to a room.`);
 
     const Room: Room = Server.rooms[RoomID];
 
@@ -272,7 +272,7 @@ Server.registerProtocol("message")
 
     const RoomID: string = Server.members[UserID].In;
     if(!RoomID) 
-        return Server.sendError(UserID, `Member ${UserID} does not belong to a room.`);
+        return Server.sendError(UserID, `You do not belong to a room.`);
 
     const MessageID: string = Server.generateUniqueUUID((UUID: string): boolean => Boolean(Server.rooms[RoomID].Messages[UUID])),
         Text: string = ContentJSON.content.Text,
@@ -303,7 +303,7 @@ Server.registerProtocol("election")
 
     const RoomID: string = Server.members[UserID].In;
     if(!RoomID) 
-        return Server.sendError(UserID, `Member ${UserID} does not belong to a room.`);
+        return Server.sendError(UserID, `You do not belong to a room.`);
     
     const Target: string = ContentJSON.content.Target,
         Room: Room = Server.rooms[RoomID],
@@ -342,7 +342,7 @@ Server.registerProtocol("demotion")
     const RoomID: string = Server.members[UserID].In;
 
     if(!RoomID) 
-        return Server.sendError(UserID, `Member ${UserID} does not belong to a room.`);
+        return Server.sendError(UserID, `You do not belong to a room.`);
         
     const Target: string = ContentJSON.content.Target,
         Room: Room = Server.rooms[RoomID],
@@ -399,7 +399,7 @@ Server.registerProtocol("sync")
 
     const RoomID: string = Server.members[UserID].In;
     if(!RoomID)
-        return Server.sendError(UserID, `Member ${UserID} does not belong to a room.`);
+        return Server.sendError(UserID, `You do not belong to a room.`);
 
     const Room: Room = Server.rooms[RoomID];
     if(UserID !== Room.Host && Room.Type === "public") 
@@ -416,7 +416,7 @@ Server.registerProtocol("upload")
 
     const RoomID: string = Server.members[UserID].In;
     if(!RoomID)
-        return Server.sendError(UserID, `Member ${UserID} does not belong to a room.`);
+        return Server.sendError(UserID, `You do not belong to a room.`);
 
     const Room: Room = Server.rooms[RoomID];
     if(UserID !== Room.Host) 
@@ -444,7 +444,7 @@ Server.registerProtocol("approve")
 
     const RoomID: string = Server.members[UserID].In;
     if(!RoomID)
-        return Server.sendError(UserID, `Member ${UserID} does not belong to a room.`);
+        return Server.sendError(UserID, `You do not belong to a room.`);
 
     const Room: Room = Server.rooms[RoomID];
     if(Room.Members.length === Room.Limit)
@@ -459,18 +459,6 @@ Server.registerProtocol("approve")
 
     Room.Queue.splice(Room.Queue.indexOf(MemberID), 1);
     sendInitMessage(RoomID, MemberID);
-});
-
-Server.registerProtocol("signal")
-(async (UserID: string, ContentJSON: sendMessageTypes.signal) => {
-    if(!validateMessage(ContentJSON, { type: "", content: { ICECandidate: "", SDPMID: "", SDPMLineIndex: "" } }))
-        return Server.sendError(UserID, `Invalid message format for ${ContentJSON.type}.`);
-
-    const RoomID: string = Server.members[UserID].In;
-    if(!RoomID)
-        return Server.sendError(UserID, `Member ${UserID} does not belong to a room.`);
-
-    Server.broadcastToRoom(RoomID, ContentJSON);
 });
 
 Server.registerProtocol("register")
