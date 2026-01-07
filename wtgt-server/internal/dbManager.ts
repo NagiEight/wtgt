@@ -8,8 +8,10 @@ interface AdminProfile {
     Password: string;
 }
 
-await fs.mkdir(path.join("./admins", "queue"), { recursive: true });
-await fs.mkdir(path.join("./admins", "approved"), { recursive: true });
+await Promise.all([
+    fs.mkdir(path.join("./admins", "queue"), { recursive: true }), 
+    fs.mkdir(path.join("./admins", "approved"), { recursive: true })
+]);
 
 export const 
     /**
@@ -21,7 +23,7 @@ export const
             throw new Error(`Admin ${UserName} doesn't exists.`);
 
         if(existence.Approved)
-            throw new Error(`Admin ${UserName} has already been approved.`)
+            throw new Error(`Admin ${UserName} has already been approved.`);
 
         await fs.rename(path.join("admins", "queue", `${UserName}.json`), path.join("admins", "approved", `${UserName}.json`));
         return UserName;

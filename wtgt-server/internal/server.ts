@@ -323,12 +323,14 @@ export const monitorableTerm = (term: ChildProcessWithoutNullStreams): void => (
      * Stop the server and write log.
      */
     close = (): void => {
-        wss.clients.forEach((client: ws.WebSocket): void => {
+        for(const UserID in members) {
+            const client: ws.WebSocket = members[UserID].Socket;
+            client.send(JSON.stringify({ type: "serverEnd" }));
             try {
                 client.terminate();
             }
             catch {}
-        });
+        }
 
         server.close(writeLog);
         process.exit(0);

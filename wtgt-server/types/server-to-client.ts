@@ -117,6 +117,10 @@ export interface newMember {
     };
 }
 
+export interface serverEnd {
+    type: "serverEnd";
+}
+
 export interface queryResult {
     type: "queryResult";
     content: {
