@@ -131,13 +131,6 @@ export interface queryResult {
             IsPaused: boolean;
             Mods: string[];
             Members: string[];
-            Messages: {
-                [MessageID: string]: {
-                    Sender: string;
-                    Text: string;
-                    Timestamp: string;
-                };
-            };
         };
     };
 }

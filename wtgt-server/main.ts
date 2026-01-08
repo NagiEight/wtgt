@@ -70,7 +70,8 @@ const sendInitMessage = (RoomID: string, UserID: string): void => {
         const prompt: string = `${consolePrompt}${toPrint}`;
         process.stdout.write(prompt);
         readline.cursorTo(process.stdout, consolePrompt.length + cursorPos)
-    }
+    },
+    RoomLog = {}
 ;
 
 interface onKeyPress {
@@ -434,7 +435,18 @@ Server.registerProtocol("query")
 
     Server.getSession(UserID).send(JSON.stringify({
         type: "queryResult",
-        content: Object.fromEntries(Object.keys(Server.rooms).filter((RoomID: string): boolean => Server.rooms[RoomID].Type === "public").map((RoomID: string) => [RoomID, Server.rooms[RoomID]]))
+        content: Object.fromEntries(
+            Object.keys(Server.rooms)
+            .filter(
+                (RoomID: string): boolean => Server.rooms[RoomID].Type === "public"
+            )
+            .map(
+                (RoomID: string) => {
+                    const { Messages, ...RoomWithoutMessage } = Server.rooms[RoomID];
+                    return [RoomID, RoomWithoutMessage];
+                }
+            )
+        )
     }));
 });
 
