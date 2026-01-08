@@ -40,7 +40,7 @@ export interface connection {
 export interface log {
     type: "log";
     content: {
-        Text: string;
+        Entry: string;
     };
 }
 

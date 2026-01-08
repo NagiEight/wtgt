@@ -290,13 +290,19 @@ const getIPs = (req: http.IncomingMessage): string[] => [...(
 
 let monitorableTerm_: ChildProcessWithoutNullStreams;
 
-export const monitorableTerm = (term: ChildProcessWithoutNullStreams): void => (monitorableTerm_ = term) as unknown as void,
-    print = (object: any, RoomID?: string): void => {
+export const monitorableTerm = (Term: ChildProcessWithoutNullStreams): void => (monitorableTerm_ = Term) as unknown as void,
+    print = (object: any, RoomID?: string, SendLog?: boolean): void => {
         let toPrint = object;
+
         if(typeof toPrint !== "string")
             toPrint = util.inspect(object);
-        monitorableTerm_.stdin.write(`${util.styleText("yellowBright", `[${getCurrentTime()}]`)}${RoomID ? `${util.styleText("greenBright", `{${RoomID}}`)}` : ""} ${toPrint}`)
+
+        monitorableTerm_.stdin.write(`${util.styleText("yellowBright", `[${getCurrentTime()}]`)}${RoomID ? `${util.styleText("greenBright", `{${RoomID}}`)}` : ""} ${toPrint}`);        
         logs.push(`[${getCurrentTime()}]${RoomID ? `{${RoomID}}` : ""} ${toPrint}`);
+
+        if(SendLog) {
+            broadcastToAdmins({ type: "log", content: { Entry: toPrint } });
+        }
     },
     hoursToMs = (time: number): number => time * 3600000,
     allowRequest = (IP: string): boolean => {
@@ -408,7 +414,7 @@ export const monitorableTerm = (term: ChildProcessWithoutNullStreams): void => (
             Output = sanitizeConfig(raw, defaultConfig);
         }
         catch(err) {
-            print(`Error reading config: ${err instanceof Error ? err.message : err}`);
+            print(`Error reading config: ${err instanceof Error ? err.message : err}`, undefined, false);
             Output = structuredClone(defaultConfig);
         }
 

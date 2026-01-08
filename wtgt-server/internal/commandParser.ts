@@ -439,8 +439,8 @@ new command("help", {
         else filteredHelpArray = helpArray;
         return `\n${Table.Parse(filteredHelpArray).Stringify()}`;
     },
-    OnSuccess: (result: string): void => print(result),
-    OnFailure: (err: any): void => print(err),
+    OnSuccess: (result: string): void => print(result, undefined, false),
+    OnFailure: (err: any): void => print(err, undefined, false),
     Params: {
         command: {
             Type: "string",

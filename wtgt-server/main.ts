@@ -109,7 +109,7 @@ process.stdin.on("keypress", async (str: string, key: onKeyPress): Promise<void>
             await command.execute(currentInput);
         }
         catch(err) {
-            Server.print(err instanceof Error ? err.message : err);
+            Server.print(err instanceof Error ? err.message : err, undefined, false);
         }
         currentInput = "";
         cursorPos = 0;
@@ -223,7 +223,7 @@ Server.registerProtocol("join")
                 Avt: MemberProfile.Avt
             }
         }));
-        Server.print(`${UserID} get puts in queue for room ${RoomID}.`);
+        Server.print(`${UserID} get puts in queue for room ${RoomID}.`, RoomID);
         return;
     }
     sendInitMessage(RoomID, UserID);
@@ -546,8 +546,8 @@ Server.registerProtocol("shutdown")
 
 new command("remove", {
     Action: db.remove,
-    OnSuccess: (result: string): void => Server.print(`Admin ${result} successfully removed.`),
-    OnFailure: (err): void => Server.print(`Error: ${err.message}`),
+    OnSuccess: (result: string): void => Server.print(`Admin ${result} successfully removed.`, undefined, false),
+    OnFailure: (err): void => Server.print(`Error: ${err.message}`, undefined, false),
     Params: {
         UserName: {
             Type: "string",
@@ -559,8 +559,8 @@ new command("remove", {
 
 new command("approve", {
     Action: db.approve,
-    OnSuccess: (result: string): void => Server.print(`Admin ${result} successfully approved.`),
-    OnFailure: (err): void => Server.print(`Error: ${err.message}`),
+    OnSuccess: (result: string): void => Server.print(`Admin ${result} successfully approved.`, undefined, false),
+    OnFailure: (err): void => Server.print(`Error: ${err.message}`, undefined, false),
     Params: {
         UserName: {
             Type: "string",
@@ -582,7 +582,7 @@ new command("uptime", {
         const [hours, minutes]: [number, number] = divmod(Tminutes, 60);
         return `${hours.toString().padStart(2, "0")}:${minutes.toString().padStart(2, "0")}:${seconds.toString().padStart(2, "0")}`;
     },
-    OnSuccess: (result: string) => Server.print(`Server's been running for: ${result}.`),
+    OnSuccess: (result: string) => Server.print(`Server's been running for: ${result}.`, undefined, false),
     Description: "Get the amount of time the server's been running."
 });
 
@@ -598,16 +598,16 @@ new command("clear", {
             }, Server.hoursToMs(Math.floor(Server.config.FlushingIntervalHours)));
         }
     },
-    OnFailure: (err: any): void => Server.print(err),
+    OnFailure: (err: any): void => Server.print(err, undefined, false),
     Description: "Manually flush the console and reset the server console flushing timer."
 });
 
 process.on("uncaughtException", (err) => {
-    Server.print(err);
+    Server.print(err, undefined, false);
     Server.close();
 });
 process.on("unhandledRejection", (err) => {
-    Server.print(err);
+    Server.print(err, undefined, false);
     Server.close();
 });
 
