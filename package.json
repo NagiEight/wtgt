@@ -1,0 +1,19 @@
+{
+  "name": "wtgt",
+  "private": true,
+  "version": "1.0.0",
+  "description": "A cozy \"Watch Together\" app built with React, Vite, Tailwind CSS, and Node.js.  \r Perfect for virtual movie nights, synced playback, and real-time chat with friends",
+  "homepage": "https://github.com/NagiEight/wtgt#readme",
+  "bugs": {
+    "url": "https://github.com/NagiEight/wtgt/issues"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/NagiEight/wtgt.git"
+  },
+  "type": "module",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "build": ""
+  }
+}

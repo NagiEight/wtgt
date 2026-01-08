@@ -8,7 +8,7 @@ interface AdminProfile {
     Password: string;
 }
 
-await Promise.all([
+await Promise.allSettled([
     fs.mkdir(path.join("./admins", "queue"), { recursive: true }), 
     fs.mkdir(path.join("./admins", "approved"), { recursive: true })
 ]);

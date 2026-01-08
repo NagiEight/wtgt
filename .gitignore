@@ -2,9 +2,6 @@ logs/
 server-properties/
 node_modules/
 cmpl/
-wtgt-frontend-tsx
-wtgt-ui-tsx
 
 test*
-package-lock.json
 run.bat

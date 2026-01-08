@@ -55,7 +55,9 @@ const sendInitMessage = (RoomID: string, UserID: string): void => {
     },
     renderConsole = (): void => {
         console.clear();
-        console.log(Server.logs.join("\n"));
+        if(Server.logs.length) {
+            console.log(Server.logs.join("\n"));
+        }
         
         const start: number = currentInput.search(/\S/);
         let index: number = currentInput.indexOf(" ", start);
@@ -174,7 +176,7 @@ Server.registerProtocol("host")
         Queue: [],
         Members: [UserID],
         Messages: {}
-    }
+    };
 
     Server.getSession(UserID).send(JSON.stringify({
         type: "info",
@@ -610,8 +612,8 @@ process.on("unhandledRejection", (err) => {
 });
 
 Server.server.listen(Server.config.PORT, () => {
-    renderConsole();
     Server.print(`Hello World! Server's running at port ${Server.config.PORT}.`);
+    renderConsole();
     if(Server.config.ServerTerminalFlushing) {
         consoleFlushingTimer = setInterval(async () => {
             await Server.writeLog();
