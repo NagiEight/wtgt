@@ -121,7 +121,8 @@ const getIPs = (req: http.IncomingMessage): string[] => [...(
         const urlParts: string[] = decodeURI(fullUrl.pathname)
             .split("/")
             .filter((value: string): boolean => !(value.length > 0 && /^[.]+$/.test(value)))
-            .map((part: string): string => part.replace(/ /g, "_"));
+            .map((part: string): string => part.replace(/ /g, "_"))
+        ;
         
         let filePath: string | null = null;
 
@@ -180,7 +181,7 @@ const getIPs = (req: http.IncomingMessage): string[] => [...(
                 const RoomID: string = members[UserID].In;
                 const Room = rooms[RoomID];
                 if(rooms[members[UserID].In].Host === UserID) {
-                    broadcastToRoom(RoomID, { type: "end", content: undefined });
+                    broadcastToRoom(RoomID, { type: "end" });
                     delete rooms[RoomID];
                 }
                 else {
@@ -209,12 +210,13 @@ const getIPs = (req: http.IncomingMessage): string[] => [...(
             if(isBinary) {
                 const RoomID: string = members[UserID].In;
                 const Room: Room = rooms[RoomID];
-                if(!Room) {
-                    sendError(UserID, "You do not belong to a room.");
-                }
+                if(!Room) 
+                    return sendError(UserID, "You do not belong to a room.");
 
-                broadcastToRoomBinaries(RoomID, data, UserID);
-                return;
+                if(Room.Host !== UserID) 
+                    return sendError(UserID, "Only the host can broadcast media.");
+
+                return broadcastToRoomBinaries(RoomID, data, UserID);
             }
 
             let ContentJSON: Message;

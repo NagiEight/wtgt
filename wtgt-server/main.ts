@@ -1,10 +1,9 @@
 "use strict";
 
-import child_process from "child_process";
 import util from "util";
 import readline from "readline";
 
-import { ChildProcessWithoutNullStreams } from "child_process";
+import { ChildProcessWithoutNullStreams, spawn } from "child_process";
 
 import validateMessage from "./helpers/validateMessage.js";
 import getCurrentTime from "./helpers/getCurrentTime.js";
@@ -17,7 +16,7 @@ import * as db from "./internal/dbManager.js";
 import { command } from "./internal/commandParser.js";
 import { Room } from "./internal/server.js";
 
-const monitorableTerm: ChildProcessWithoutNullStreams = child_process.spawn("node", ["./helpers/echo.js"], { stdio: "pipe" });
+const monitorableTerm: ChildProcessWithoutNullStreams = spawn("node", ["./helpers/echo.js"], { stdio: "pipe" });
 
 const sendInitMessage = (RoomID: string, UserID: string): void => {
         const Room: Room = Server.rooms[RoomID];    
