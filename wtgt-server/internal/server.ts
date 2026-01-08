@@ -216,7 +216,7 @@ const getIPs = (req: http.IncomingMessage): string[] => [...(
                 if(Room.Host !== UserID) 
                     return sendError(UserID, "Only the host can broadcast media.");
 
-                return broadcastToRoomBinaries(RoomID, data, UserID);
+                return broadcastToRoom(RoomID, data, [UserID], true);
             }
 
             let ContentJSON: Message;
@@ -340,27 +340,22 @@ export const monitorableTerm = (term: ChildProcessWithoutNullStreams): void => (
     /**
      * Broadcast ContentJSON to room of RoomID.
      */
-    broadcastToRoom = (RoomID: string, ContentJSON: Message, ...except: string[]): void => {
+    broadcastToRoom = (RoomID: string, Content: Message | ws.RawData, Except?: string[], Binary?: boolean): void => {
         if(!rooms[RoomID])
             return;
 
         for(const UserID of rooms[RoomID].Members) {
-            const member: MembersObj[""] = members[UserID],
-            session: ws.WebSocket = getSession(UserID);
-            if(member && session && session.readyState === ws.WebSocket.OPEN && !except.includes(UserID)) {
-                session.send(JSON.stringify(ContentJSON));
-            }
-        }
-    },
-    broadcastToRoomBinaries = (RoomID: string, Buffer: ws.RawData, ...except: string[]): void => {
-        if(!rooms[RoomID])
-            return;
+            const member: MembersObj[keyof MembersObj] = members[UserID],
+                session: ws.WebSocket = getSession(UserID)
+            ;
 
-        for(const UserID of rooms[RoomID].Members) {
-            const member: MembersObj[""] = members[UserID],
-            session: ws.WebSocket = getSession(UserID);
-            if(member && session && session.readyState === ws.WebSocket.OPEN && !except.includes(UserID)) {
-                session.send(Buffer, { binary: true });
+            let toSend: string | ws.RawData;
+            if(Binary)
+                toSend = Content as ws.RawData;
+            else toSend = JSON.stringify(Content);
+
+            if(member && session && session.readyState === ws.WebSocket.OPEN && !Except.includes(UserID)) {
+                session.send(toSend);
             }
         }
     },

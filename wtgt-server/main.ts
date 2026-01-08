@@ -42,7 +42,7 @@ const sendInitMessage = (RoomID: string, UserID: string): void => {
                 UserName: Server.members[UserID].UserName,
                 Avt: Server.members[UserID].Avt
             } 
-        }, UserID);
+        }, [UserID]);
 
         Server.broadcastToAdmins({ 
             type: "userJoin", 
