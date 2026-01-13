@@ -344,9 +344,9 @@ export const logs: string[] = [],
         process.exit(0);
     }, 
     /**
-     * Broadcast ContentJSON to room of RoomID.
+     * Broadcast Content to room of RoomID.
      */
-    broadcastToRoom = (RoomID: string, Content: Message | ws.RawData, Except?: string[], Binary?: boolean): void => {
+    broadcastToRoom = (RoomID: string, Content: Message | ws.RawData, Except: string[] = [], Binary?: boolean): void => {
         if(!rooms[RoomID])
             return;
 
@@ -430,4 +430,11 @@ export const logs: string[] = [],
 ;
 
 wss.on("connection", wssInternals);
-server.on("error", close);
+wss.on("error", (err): void => {
+    close();
+    print(err.message, undefined, false);
+});
+server.on("error", (err): void => {
+    close();
+    print(err.message, undefined, false);
+});
