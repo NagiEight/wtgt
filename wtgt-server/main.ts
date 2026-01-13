@@ -16,7 +16,23 @@ import * as db from "./internal/dbManager.js";
 import { command } from "./internal/commandParser.js";
 import { Room } from "./internal/server.js";
 
-const monitorableTerm: ChildProcessWithoutNullStreams = spawn("node", ["./helpers/echo.js"], { stdio: ["pipe", "pipe", "pipe"] });
+export const renderConsole = (): void => {
+    console.clear();
+    if(Server.logs.length) 
+        console.log(Server.logs.join("\n"));
+    
+    const start: number = currentInput.search(/\S/);
+    let index: number = currentInput.indexOf(" ", start);
+
+    if(index === -1)
+        index = currentInput.length;
+
+    const toPrint: string = `${util.styleText(["yellowBright"], currentInput.substring(0, index))}${currentInput.substring(index)}`;
+
+    const prompt: string = `${consolePrompt}${toPrint}`;
+    process.stdout.write(prompt);
+    readline.cursorTo(process.stdout, consolePrompt.length + cursorPos)
+};
 
 const sendInitMessage = (RoomID: string, UserID: string): void => {
         const Room: Room = Server.rooms[RoomID];    
@@ -52,23 +68,6 @@ const sendInitMessage = (RoomID: string, UserID: string): void => {
             } 
         });
         Server.print(`${UserID} joined a room.`, RoomID);
-    },
-    renderConsole = (): void => {
-        console.clear();
-        if(Server.logs.length) 
-            console.log(Server.logs.join("\n"));
-        
-        const start: number = currentInput.search(/\S/);
-        let index: number = currentInput.indexOf(" ", start);
-
-        if(index === -1)
-            index = currentInput.length;
-
-        const toPrint: string = `${util.styleText(["yellowBright"], currentInput.substring(0, index))}${currentInput.substring(index)}`;
-
-        const prompt: string = `${consolePrompt}${toPrint}`;
-        process.stdout.write(prompt);
-        readline.cursorTo(process.stdout, consolePrompt.length + cursorPos)
     },
     divmod = (dividend: number, divisor: number): [number, number] => [
         Math.floor(dividend / divisor), 
@@ -468,10 +467,11 @@ Server.registerProtocol("approve")
         return Server.sendError(UserID, "Insufficient permission.");
 
     const MemberID: string = ContentJSON.content.MemberID;
-    if(!Server.members[MemberID])
-        return Server.sendError(UserID, `Member ${MemberID} doesn't exists.`);
+    const Index: number = Room.Queue.indexOf(MemberID);
+    if(Index === -1)
+        return Server.sendError(UserID, `Member ${MemberID} doesn't exists or isn't currently in queue.`);
 
-    Room.Queue.splice(Room.Queue.indexOf(MemberID), 1);
+    Room.Queue.splice(Index, 1);
     sendInitMessage(RoomID, MemberID);
 });
 

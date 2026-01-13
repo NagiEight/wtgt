@@ -12,6 +12,8 @@ import getCurrentTime from "../helpers/getCurrentTime.js";
 
 import * as db from "./dbManager.js";
 
+import { renderConsole } from "../main.js";
+
 export interface Room {
     CurrentMedia: string;
     Host: string;
@@ -299,6 +301,8 @@ export const logs: string[] = [],
 
         monitorableTerm_.stdin.write(`${util.styleText("yellowBright", `[${getCurrentTime()}]`)}${RoomID ? `${util.styleText("greenBright", `{${RoomID}}`)}` : ""} ${toPrint}`);        
         logs.push(`[${getCurrentTime()}]${RoomID ? `{${RoomID}}` : ""} ${toPrint}`);
+
+        renderConsole();
 
         if(SendLog) {
             broadcastToAdmins({ type: "log", content: { Entry: toPrint } });
