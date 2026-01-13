@@ -37,18 +37,6 @@ export const Dashboard = () => {
       //hostRoom(roomData.mediaName, roomData.type, false);
       const newRoom = await hostRoom(roomData.mediaName, roomData.type, false);
       console.log("New room created:", newRoom);
-      // const convertedNewRoom = {
-      //   id: newRoom,
-      //   name: roomData.name,
-      //   type: roomData.type,
-      //   currentMedia: roomData.mediaName,
-      //   isPaused: false,
-      //   host: {
-      //     id: 0,
-      //     username: "You",
-      //     avatar: "🧑‍💻",
-      //   },
-      // };
       setRooms([...rooms]);
 
       navigate(`/room/${newRoom}`);
@@ -59,7 +47,7 @@ export const Dashboard = () => {
   const handleJoinRoom = (roomId: string) => {
     if (joinRoom) {
       joinRoom(roomId);
-      //navigate(`/room/${roomId}`);
+      navigate(`/room/${roomId}`);
     }
   };
 
