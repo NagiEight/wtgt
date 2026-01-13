@@ -16,7 +16,7 @@ import * as db from "./internal/dbManager.js";
 import { command } from "./internal/commandParser.js";
 import { Room } from "./internal/server.js";
 
-const monitorableTerm: ChildProcessWithoutNullStreams = spawn("node", ["./helpers/echo.js"], { stdio: "pipe" });
+const monitorableTerm: ChildProcessWithoutNullStreams = spawn("node", ["./helpers/echo.js"], { stdio: ["pipe", "pipe", "pipe"] });
 
 const sendInitMessage = (RoomID: string, UserID: string): void => {
         const Room: Room = Server.rooms[RoomID];    

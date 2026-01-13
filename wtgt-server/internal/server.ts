@@ -6,7 +6,7 @@ import util from "util";
 import * as ws from "ws";
 
 import { existsSync } from "fs";
-import { ChildProcessWithoutNullStreams } from "child_process";
+import { ChildProcessWithoutNullStreams, spawn } from "child_process";
 
 import getCurrentTime from "../helpers/getCurrentTime.js";
 
@@ -291,6 +291,7 @@ const getIPs = (req: http.IncomingMessage): string[] => [...(
 let monitorableTerm_: ChildProcessWithoutNullStreams;
 
 export const monitorableTerm = (Term: ChildProcessWithoutNullStreams): void => (monitorableTerm_ = Term) as unknown as void,
+    logs: string[] = [],
     print = (object: any, RoomID?: string, SendLog?: boolean): void => {
         let toPrint = object;
 
@@ -426,8 +427,7 @@ export const monitorableTerm = (Term: ChildProcessWithoutNullStreams): void => (
     members: MembersObj = {},
     adminLookUp: string[] = [],
     server: http.Server<typeof http.IncomingMessage, typeof http.ServerResponse> = http.createServer(serverInternals),
-    wss: ws.WebSocketServer = new ws.WebSocketServer({ server }),
-    logs: string[] = []
+    wss: ws.WebSocketServer = new ws.WebSocketServer({ server })
 ;
 
 wss.on("connection", wssInternals);
