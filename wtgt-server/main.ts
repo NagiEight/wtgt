@@ -30,7 +30,7 @@ const sendInitMessage = (RoomID: string, UserID: string): void => {
             Mods: Room.Mods,
             Members: Object.fromEntries(Room.Members.map((MemberID: string) => [MemberID, { UserName: Server.members[MemberID].UserName, Avt: Server.members[MemberID].Avt }])),
             Messages: Room.Messages,
-            RoomID: RoomID
+            RoomID
         };
 
         Server.getSession(UserID).send(JSON.stringify({ type: "init", content: toSend }));
@@ -55,9 +55,8 @@ const sendInitMessage = (RoomID: string, UserID: string): void => {
     },
     renderConsole = (): void => {
         console.clear();
-        if(Server.logs.length) {
+        if(Server.logs.length) 
             console.log(Server.logs.join("\n"));
-        }
         
         const start: number = currentInput.search(/\S/);
         let index: number = currentInput.indexOf(" ", start);
@@ -71,7 +70,10 @@ const sendInitMessage = (RoomID: string, UserID: string): void => {
         process.stdout.write(prompt);
         readline.cursorTo(process.stdout, consolePrompt.length + cursorPos)
     },
-    RoomLog = {}
+    divmod = (dividend: number, divisor: number): [number, number] => [
+        Math.floor(dividend / divisor), 
+        Math.floor(dividend % divisor)
+    ]
 ;
 
 interface onKeyPress {
@@ -442,8 +444,8 @@ Server.registerProtocol("query")
             )
             .map(
                 (RoomID: string) => {
-                    const { Messages, ...RoomWithoutMessage } = Server.rooms[RoomID];
-                    return [RoomID, RoomWithoutMessage];
+                    const { Messages, ...Room } = Server.rooms[RoomID];
+                    return [RoomID, Room];
                 }
             )
         )
@@ -589,7 +591,6 @@ new command("stop", {
 
 new command("uptime", {
     Action: (): string => {
-        const divmod = (dividend: number, divisor: number): [number, number] => [Math.floor(dividend / divisor), Math.floor(dividend % divisor)];
         const [Tminutes, seconds]: [number, number] = divmod(Math.floor(process.uptime()), 60);
         const [hours, minutes]: [number, number] = divmod(Tminutes, 60);
         return `${hours.toString().padStart(2, "0")}:${minutes.toString().padStart(2, "0")}:${seconds.toString().padStart(2, "0")}`;
