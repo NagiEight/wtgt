@@ -58,6 +58,7 @@ export interface HostContent {
   MediaName: string;
   RoomType: "private" | "public";
   IsPaused: boolean;
+  Limit: number;
 }
 
 export interface HostResponse {

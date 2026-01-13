@@ -236,7 +236,8 @@ export class WebSocketClient {
   public hostRoom(
     mediaName: string,
     roomType: "private" | "public",
-    isPaused = false
+    isPaused = false,
+    Limit = 20
   ): Promise<string> {
     console.log("Hosting room on server");
 
@@ -245,6 +246,7 @@ export class WebSocketClient {
         MediaName: mediaName,
         RoomType: roomType,
         IsPaused: isPaused,
+        Limit: Limit,
       });
 
       const handler = (event: MessageEvent) => {
@@ -411,14 +413,6 @@ export class WebSocketClient {
     };
     this.ws?.addEventListener("message", handler);
   }
-
-  // =============================================
-  // Media Operations
-  // =============================================
-
-  /**
-   * Upload new media to room
-   */
   public uploadMedia(mediaName: string): void {
     this.sendRequest<UploadContent>("upload", {
       MediaName: mediaName,
@@ -431,6 +425,8 @@ export class WebSocketClient {
         if (data.type === "upload" && data.content) {
           console.log("Upload progress:", data.content);
           // You can add more detailed progress handling here if needed
+        } else {
+          console.log("upload error:", data.content);
         }
       } catch (err) {
         console.error("Error handling upload:", err);
