@@ -288,10 +288,9 @@ const getIPs = (req: http.IncomingMessage): string[] => [...(
     }
 ;
 
-let monitorableTerm_: ChildProcessWithoutNullStreams;
+let monitorableTerm_: ChildProcessWithoutNullStreams = spawn("node", ["./helpers/echo.js"], { stdio: ["pipe", "pipe", "pipe"] });
 
-export const monitorableTerm = (Term: ChildProcessWithoutNullStreams): void => (monitorableTerm_ = Term) as unknown as void,
-    logs: string[] = [],
+export const logs: string[] = [],
     print = (object: any, RoomID?: string, SendLog?: boolean): void => {
         let toPrint = object;
 

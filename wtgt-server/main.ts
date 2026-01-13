@@ -91,7 +91,6 @@ let consoleFlushingTimer: NodeJS.Timeout,
     consolePrompt = "Console Command: "
 ;
 
-Server.monitorableTerm(monitorableTerm);
 readline.emitKeypressEvents(process.stdin);
 process.stdin.setEncoding("utf-8");
 process.stdin.resume();
